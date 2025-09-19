@@ -1,9 +1,11 @@
+require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const token = '8168230928:AAHuuWj3hlSXTMLKJv8e18D1a_wjey6LKpk';
+
+const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
-const adminChatId = 8128014321;
+const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const users = {
   [adminChatId]: {
     name: 'Адміністратор',
@@ -12,6 +14,14 @@ const users = {
     verificationRequested: false
   }
 };
+
+// 🔔 Перевірка запуску
+bot.on('message', (msg) => {
+  if (msg.chat.id === adminChatId) {
+    bot.sendMessage(adminChatId, '✅ Бот запущено і працює!');
+  }
+});
+
 const activeOrders = {};
 const pendingQuestions = [];
 let currentReplyTarget = null;

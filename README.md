@@ -14,4 +14,4 @@
 ```bash
 npm install
 cp .env.example .env
-node 232.js
+node index.js
