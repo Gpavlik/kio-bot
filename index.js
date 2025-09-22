@@ -25,6 +25,7 @@ bot.on('message', (msg) => {
 const activeOrders = {};
 const pendingQuestions = [];
 let currentReplyTarget = null;
+const pendingMessages = [];
 const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
 
@@ -139,6 +140,35 @@ bot.on('message', (msg) => {
     bot.sendMessage(adminChatId, `❓ Запитання від @${users[chatId].username}:\n${text}`);
     return;
   }
+if (msg.chat.id === adminChatId && msg.text === '📩 Відповісти користувачу') {
+  if (pendingMessages.length === 0) {
+    bot.sendMessage(chatId, '✅ Немає запитів без відповіді.');
+    return;
+  }
+
+  pendingMessages.forEach((req) => {
+    bot.sendMessage(chatId, `🧾 Запит від @${req.username}:\n\n${req.text}`, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✍️ Відповісти', callback_data: `reply_${req.chatId}` }
+        ]]
+      }
+    });
+  });
+
+  return;
+}
+if (msg.chat.id === adminChatId && currentReplyTarget) {
+  bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${msg.text}`);
+  bot.sendMessage(adminChatId, `✅ Відповідь надіслано.`);
+
+  // Видаляємо з pending
+  const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
+  if (index !== -1) pendingMessages.splice(index, 1);
+
+  currentReplyTarget = null;
+  return;
+}
 
   // 🛒 Старт замовлення
   if (text === '🛒 Зробити замовлення') {
@@ -379,13 +409,13 @@ bot.on('message', (msg) => {
       phone: order.phone,
       status: order.status
     }).then(() => {
-      console.log(`✅ Замовлення записано для ${chatId}`);
+      console.log(`✅ Замовлення записано для ${order.address}`);
     }).catch((err) => {
       console.error(`❌ Помилка запису замовлення: ${err.message}`);
       bot.sendMessage(adminChatId, `⚠️ Не вдалося записати замовлення від @${users[chatId].username}: ${err.message}`);
     });
 
-    bot.sendMessage(adminChatId, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
+    bot.sendMessage(adminChatId, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].address}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
       reply_markup: {
         inline_keyboard: [
           [
@@ -411,7 +441,12 @@ bot.on('callback_query', (query) => {
       bot.answerCallbackQuery(query.id, { text: '⛔️ Запит не знайдено.' });
       return;
     }
-
+if (data.startsWith('reply_')) {
+  currentReplyTarget = parseInt(data.split('_')[1], 10);
+  bot.sendMessage(adminChatId, `✍️ Напишіть відповідь для користувача ${currentReplyTarget}`);
+  bot.answerCallbackQuery(query.id);
+  return;
+}
     verifiedUsers.add(targetId);
     users[targetId].verificationRequested = false;
 
