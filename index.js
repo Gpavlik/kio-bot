@@ -15,20 +15,13 @@ const users = {
   }
 };
 
-// 🔔 Перевірка запуску
-bot.on('message', (msg) => {
-  if (msg.chat.id === adminChatId) {
-    bot.sendMessage(adminChatId, '✅ Бот запущено і працює!');
-  }
-});
-
 const activeOrders = {};
-const pendingQuestions = [];
-let currentReplyTarget = null;
-const pendingMessages = [];
 const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
+const pendingMessages = [];
+let currentReplyTarget = null;
 
+// 🧾 Головна клавіатура
 function getMainKeyboard(chatId) {
   if (!verifiedUsers.has(chatId)) return undefined;
   return {
@@ -42,6 +35,8 @@ function getMainKeyboard(chatId) {
     }
   };
 }
+
+// 🚀 Старт
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from;
@@ -54,6 +49,7 @@ bot.onText(/\/start/, (msg) => {
       verificationRequested: false
     };
   }
+
   if (!verifiedUsers.has(chatId)) {
     if (!users[chatId].verificationRequested) {
       users[chatId].verificationRequested = true;
@@ -64,14 +60,18 @@ bot.onText(/\/start/, (msg) => {
     }
     return;
   }
+
   bot.sendMessage(chatId, `Вітаємо, ${first_name}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`, getMainKeyboard(chatId));
 });
+
+// 💬 Обробка повідомлень
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const isAdmin = chatId === adminChatId;
   if (!text) return;
-  // Верифікація поетапно
+
+  // 🔐 Верифікація
   if (!verifiedUsers.has(chatId) && !isAdmin) {
     const request = verificationRequests[chatId];
     if (!request) return;
@@ -82,6 +82,7 @@ bot.on('message', (msg) => {
       bot.sendMessage(chatId, `⛔️ Ваш запит анульовано через неактивність. Надішліть /start, щоб почати знову.`);
       return;
     }
+
     switch (request.step) {
       case 1:
         request.name = text;
@@ -115,60 +116,78 @@ bot.on('message', (msg) => {
     }
     return;
   }
-  // Відповідь оператора 
-  if (isAdmin && currentReplyTarget) {
-    bot.sendMessage(currentReplyTarget, `📩 Повідомлення від оператора:\n${text}`);
-    bot.sendMessage(chatId, '✅ Відповідь надіслано.');
-    pendingQuestions = pendingQuestions.filter(q => q.chatId !== currentReplyTarget);
-    currentReplyTarget = null;
-    return;
-  }
-});
-  // ❓ Запитання
-bot.on('message', (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
 
+  // ❓ Запитання в режимі questionMode
   if (activeOrders[chatId]?.questionMode) {
-    pendingQuestions.push({
+    pendingMessages.push({
       chatId,
       username: users[chatId].username,
-      question: text
+      text
     });
     delete activeOrders[chatId];
     bot.sendMessage(chatId, `✅ Ваше запитання надіслано оператору.`);
-    bot.sendMessage(adminChatId, `❓ Запитання від @${users[chatId].username}:\n${text}`);
-    return;
-  }
-if (msg.chat.id === adminChatId && msg.text === '📩 Відповісти користувачу') {
-  if (pendingMessages.length === 0) {
-    bot.sendMessage(chatId, '✅ Немає запитів без відповіді.');
-    return;
-  }
-
-  pendingMessages.forEach((req) => {
-    bot.sendMessage(chatId, `🧾 Запит від @${req.username}:\n\n${req.text}`, {
+    bot.sendMessage(adminChatId, `❓ Запитання від @${users[chatId].username}:\n${text}`, {
       reply_markup: {
         inline_keyboard: [[
-          { text: '✍️ Відповісти', callback_data: `reply_${req.chatId}` }
+          { text: '✍️ Відповісти', callback_data: `reply_${chatId}` }
         ]]
       }
     });
-  });
+    return;
+  }
 
-  return;
-}
-if (msg.chat.id === adminChatId && currentReplyTarget) {
-  bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${msg.text}`);
-  bot.sendMessage(adminChatId, `✅ Відповідь надіслано.`);
+  // 📩 Команда "Відповісти користувачу"
+  if (isAdmin && text === '📩 Відповісти користувачу') {
+    if (pendingMessages.length === 0) {
+      bot.sendMessage(chatId, '✅ Немає запитів без відповіді.');
+      return;
+    }
 
-  // Видаляємо з pending
-  const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
-  if (index !== -1) pendingMessages.splice(index, 1);
+    pendingMessages.forEach((req) => {
+      bot.sendMessage(chatId, `🧾 Запит від @${req.username}:\n\n${req.text}`, {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '✍️ Відповісти', callback_data: `reply_${req.chatId}` }
+          ]]
+        }
+      });
+    });
+    return;
+  }
 
-  currentReplyTarget = null;
-  return;
-}
+  // ✍️ Відповідь оператора
+  if (isAdmin && currentReplyTarget) {
+    bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
+    bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
+
+    const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
+    if (index !== -1) pendingMessages.splice(index, 1);
+
+    currentReplyTarget = null;
+    return;
+  }
+
+// 🔘 Обробка інлайн-кнопок
+bot.on('callback_query', (query) => {
+  const data = query.data;
+
+  if (data.startsWith('verify_')) {
+    const chatId = parseInt(data.split('_')[1], 10);
+    verifiedUsers.add(chatId);
+    delete verificationRequests[chatId];
+    users[chatId].verificationRequested = false;
+    bot.sendMessage(chatId, `✅ Доступ надано. Ви можете користуватись ботом.`, getMainKeyboard(chatId));
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  if (data.startsWith('reply_')) {
+    currentReplyTarget = parseInt(data.split('_')[1], 10);
+    bot.sendMessage(adminChatId, `✍️ Напишіть відповідь для користувача ${currentReplyTarget}`);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+});
 
   // 🛒 Старт замовлення
   if (text === '🛒 Зробити замовлення') {
