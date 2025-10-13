@@ -368,16 +368,11 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
     return;
   }
 if (text === '📁 Клінічні випадки') {
-  bot.sendMessage(chatId, '📄 Натисніть кнопку нижче, щоб завантажити PDF:', {
-    reply_markup: {
-      inline_keyboard: [[
-        { text: '⬇️ Завантажити PDF', url: 'https://drive.google.com/file/d/1MmwidOi8dMMAP40413FgnDB-NwZPbMT9/view?usp=drive_link' }
-      ]]
-    }
+  bot.sendDocument(chatId, './KioMedine Patient Cases_v2.0.0.pdf', {
+    caption: '📄 Клінічні випадки застосування препарату'
   });
   return;
 }
-
 });
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
