@@ -72,56 +72,66 @@ bot.on('message', (msg) => {
   if (!text) return;
 
   // 🔐 Верифікація
-  if (!verifiedUsers.has(chatId) && !isAdmin) {
-    const request = verificationRequests[chatId];
-    if (!request) return;
+if (!verifiedUsers.has(chatId) && !isAdmin) {
+  const request = verificationRequests[chatId];
+  if (!request) return;
 
-    if (Date.now() - request.createdAt > 24 * 60 * 60 * 1000) {
-      delete verificationRequests[chatId];
-      users[chatId].verificationRequested = false;
-      bot.sendMessage(chatId, `⛔️ Ваш запит анульовано через неактивність. Надішліть /start, щоб почати знову.`);
-      return;
-    }
-
-    switch (request.step) {
-      case 1:
-        request.name = text;
-        request.step = 2;
-        bot.sendMessage(chatId, `📞 Введіть Ваш номер телефону:`);
-        return;
-      case 2:
-        if (!/^(\+380|0)\d{9}$/.test(text)) {
-          bot.sendMessage(chatId, `❗ Введіть коректний номер телефону.`);
-          return;
-        }
-        request.phone = text;
-        request.step = 3;
-        bot.sendMessage(chatId, `🏙️ Введіть місто:`);
-        return;
-      case 3:
-        request.town = text;
-        request.step = 4;
-        bot.sendMessage(chatId, `🏢 Введіть місце роботи:`);
-        return;
-      case 4:
-        request.workplace = text;
-        request.step = 5;
-        bot.sendMessage(chatId, `⏳ Дані надіслані оператору. Очікуйте підтвердження.`);
-        bot.sendMessage(adminChatId, `🔐 Запит на верифікацію:\n👤 ${request.name}\n📞 ${request.phone}\n🏙️ ${request.town}\n🏢 ${request.workplace}\n🆔 chatId: ${chatId}`, {
-          reply_markup: {
-            inline_keyboard: [[{ text: '✅ Надати доступ', callback_data: `verify_${chatId}` }]]
-          }
-        });
-        return;
-    }
+  if (Date.now() - request.createdAt > 24 * 60 * 60 * 1000) {
+    delete verificationRequests[chatId];
+    users[chatId].verificationRequested = false;
+    bot.sendMessage(chatId, `⛔️ Ваш запит анульовано через неактивність. Надішліть /start, щоб почати знову.`);
     return;
   }
 
-  // ❓ Запитання в режимі questionMode
-  if (activeOrders[chatId]?.questionMode) {
-    pendingMessages.push({
-      chatId,
-      username: users[chatId].username,
+  switch (request.step) {
+    case 1:
+      request.name = text;
+      request.step = 2;
+      bot.sendMessage(chatId, `📞 Введіть Ваш номер телефону:`);
+      return;
+
+    case 2:
+      if (!/^(\+380|0)\d{9}$/.test(text)) {
+        bot.sendMessage(chatId, `❗ Введіть коректний номер телефону.`);
+        return;
+      }
+      request.phone = text;
+      request.step = 3;
+      bot.sendMessage(chatId, `🏙️ Введіть місто:`);
+      return;
+
+    case 3:
+      request.town = text;
+      request.step = 4;
+      bot.sendMessage(chatId, `🏢 Введіть місце роботи:`);
+      return;
+
+    case 4:
+      request.workplace = text;
+      request.step = 5;
+      bot.sendMessage(chatId, `👤 Введіть ПІБ співробітника, який проводить верифікацію:`);
+      return;
+
+    case 5:
+      request.verifierName = text;
+      request.step = 6;
+      bot.sendMessage(chatId, `⏳ Дані надіслані оператору. Очікуйте підтвердження.`);
+
+      bot.sendMessage(adminChatId, `🔐 Запит на верифікацію:\n👤 ${request.name}\n📞 ${request.phone}\n🏙️ ${request.town}\n🏢 ${request.workplace}\n👤 Співробітник: ${request.verifierName}\n🆔 chatId: ${chatId}`, {
+        reply_markup: {
+          inline_keyboard: [[{ text: '✅ Надати доступ', callback_data: `verify_${chatId}` }]]
+        }
+      });
+      return;
+  }
+  return;
+}
+
+// ❓ Запитання в режимі questionMode
+if (activeOrders[chatId]?.questionMode) {
+  pendingMessages.push({
+    chatId,
+    username: users[chatId].username,
       text
     });
     delete activeOrders[chatId];
@@ -219,7 +229,7 @@ bot.on('callback_query', (query) => {
     lastOrder.status = 'скасовано';
     bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
 
-   axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+   axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
   action: 'updateStatus',
   timestamp: lastOrder.timestamp,
    chatId: chatId,
@@ -265,12 +275,13 @@ bot.on('callback_query', (query) => {
   }
 
   // ℹ️ Інформація
-  if (text === 'ℹ️ Інформація') {
+   if (text === 'ℹ️ Інформація') {
     bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
       reply_markup: {
         keyboard: [
           ['🛠 Дія', '📦 Склад'],
           ['⚙️ Ефект', '⚠️ Увага'],
+          ['💡 Клінічні випадки'],
           ['📝 Застосування', '🔙 Назад']
         ],
         resize_keyboard: true
@@ -354,6 +365,17 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
 • Пацієнтам слід рекомендувати уникати надмірних фізичних навантажень на суглоб протягом перших 48 годин після ін'єкції.`);
     return;
   }
+if (text === '📁 Клінічні випадки') {
+  bot.sendMessage(chatId, '📄 Натисніть кнопку нижче, щоб завантажити PDF:', {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '⬇️ Завантажити PDF', url: 'https://drive.google.com/file/d/1MmwidOi8dMMAP40413FgnDB-NwZPbMT9/view?usp=drive_link' }
+      ]]
+    }
+  });
+  return;
+}
+
 });
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
@@ -415,7 +437,7 @@ bot.on('message', (msg) => {
 
     bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
-    axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
       action: 'add',
       timestamp: order.timestamp,
        chatId: chatId,
@@ -434,21 +456,64 @@ bot.on('message', (msg) => {
       bot.sendMessage(adminChatId, `⚠️ Не вдалося записати замовлення від @${users[chatId].username}: ${err.message}`);
     });
 
-    bot.sendMessage(adminChatId, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].address}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-            { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-          ]
-        ]
-      }
-    });
+    bot.sendMessage(adminChatId, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
+  reply_markup: {
+    inline_keyboard: [
+      [
+        { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+        { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+      ],
+      [
+        { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${order.timestamp}` }
+      ]
+    ]
+  }
+});
 
     delete activeOrders[chatId];
     return;
   }
 });
+
+bot.on('callback_query', (query) => {
+  const data = query.data;
+  const adminId = query.message.chat.id;
+
+  if (data.startsWith('ttn_')) {
+    const [_, targetId, timestamp] = data.split('_');
+    pendingTTN[adminId] = { targetId, timestamp };
+    bot.sendMessage(adminId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // інші callback'и...
+});
+
+bot.on('message', (msg) => {
+  const adminId = msg.chat.id;
+  const text = msg.text;
+
+  if (pendingTTN[adminId]) {
+    const { targetId, timestamp } = pendingTTN[adminId];
+
+    bot.sendMessage(targetId, `🚚 Ваше замовлення відправлено!\n📦 Номер ТТН: ${text}`);
+    bot.sendMessage(adminId, `✅ ТТН надіслано користувачу @${users[targetId].username} (${targetId})`);
+    
+    // (опціонально) зберегти ТТН у orders
+    const userOrders = users[targetId]?.orders || [];
+    const order = userOrders.find(o => o.timestamp == timestamp);
+    if (order) order.ttn = text;
+
+    delete pendingTTN[adminId];
+    return;
+  }
+
+  // інші повідомлення...
+});
+
+
+
 bot.on('callback_query', (query) => {
   const data = query.data;
 
@@ -469,7 +534,7 @@ if (data.startsWith('reply_')) {
     verifiedUsers.add(targetId);
     users[targetId].verificationRequested = false;
 
-    axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
       action: 'addUser',
       timestamp: Date.now(),
       chatId: targetId,
@@ -477,7 +542,8 @@ if (data.startsWith('reply_')) {
       username: users[targetId].username,
       phone: request.phone,
       town: request.town,
-      workplace: request.workplace
+      workplace: request.workplace,
+      verifierName: request.verifierName // 👈 Додано ПІБ співробітника
     });
 
     delete verificationRequests[targetId];
@@ -502,7 +568,7 @@ if (data.startsWith('reply_')) {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -529,7 +595,7 @@ if (data.startsWith('reply_')) {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -601,7 +667,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
 
  
 if (order.status !== 'прийнято') {
-  axios.post('https://script.google.com/macros/s/AKfycbwjZ9oBY0n2yr7di5A5kbOPD6kA4LXA5rx3YwjquvFin4-spQhYMqrQRRucAla5htZm/exec', {
+  axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
     action: 'updateStatus',
     timestamp: order.timestamp,
     chatId: chatId,
