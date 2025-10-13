@@ -20,6 +20,8 @@ const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
 const pendingMessages = [];
 let currentReplyTarget = null;
+const pendingTTN = {};
+
 
 // 🧾 Головна клавіатура
 function getMainKeyboard(chatId) {
