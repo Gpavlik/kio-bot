@@ -81,11 +81,23 @@ bot.on('message', (msg) => {
   const user = users[chatId];
 
   if (!text) return;
+// ✍️ Відповідь оператором після натискання кнопки "Відповісти"
+if (isAdmin && currentReplyTarget) {
+  bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
+  bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
 
-  // 🔐 Верифікація
-  if (!verifiedUsers.has(chatId) && !isAdmin) {
-    const request = verificationRequests[chatId];
-    if (!request) return;
+  // Видаляємо запит з черги
+  const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
+  if (index !== -1) pendingMessages.splice(index, 1);
+
+  currentReplyTarget = null;
+  return;
+}
+
+// 🔐 Верифікація
+if (!verifiedUsers.has(chatId) && !isAdmin) {
+  const request = verificationRequests[chatId];
+  if (!request) return;
 
     if (Date.now() - request.createdAt > 24 * 60 * 60 * 1000) {
       delete verificationRequests[chatId];
@@ -251,6 +263,8 @@ bot.on('message', (msg) => {
   const isAdmin = chatId === adminChatId;
   if (!text) return;
   const user = users[chatId];
+
+
 // ℹ️ Інформація
 if (text === 'ℹ️ Інформація') {
   bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
