@@ -244,6 +244,13 @@ bot.on('message', (msg) => {
     }
   }
 });
+// 💬 Обробка повідомлень
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  const isAdmin = chatId === adminChatId;
+  if (!text) return;
+  const user = users[chatId];
 // ℹ️ Інформація
 if (text === 'ℹ️ Інформація') {
   bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
@@ -369,6 +376,8 @@ if (text === '📞 Зв’язатися з оператором') {
   bot.sendContact(chatId, '+380932168041', 'Оператор');
   return;
 }
+});
+
 bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
