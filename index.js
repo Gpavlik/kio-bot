@@ -15,12 +15,12 @@ const users = {
   }
 };
 
-const activeOrders = {};
 const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
+const activeOrders = {};
 const pendingMessages = [];
-let currentReplyTarget = null;
 const pendingTTN = {};
+let currentReplyTarget = null;
 const lastSent = {};
 function getMainKeyboard(chatId) {
   if (!verifiedUsers.has(chatId)) return undefined;
@@ -81,23 +81,11 @@ bot.on('message', (msg) => {
   const user = users[chatId];
 
   if (!text) return;
-// ✍️ Відповідь оператором після натискання кнопки "Відповісти"
-if (isAdmin && currentReplyTarget) {
-  bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
-  bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
 
-  // Видаляємо запит з черги
-  const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
-  if (index !== -1) pendingMessages.splice(index, 1);
-
-  currentReplyTarget = null;
-  return;
-}
-
-// 🔐 Верифікація
-if (!verifiedUsers.has(chatId) && !isAdmin) {
-  const request = verificationRequests[chatId];
-  if (!request) return;
+  // 🔐 Верифікація
+  if (!verifiedUsers.has(chatId) && !isAdmin) {
+    const request = verificationRequests[chatId];
+    if (!request) return;
 
     if (Date.now() - request.createdAt > 24 * 60 * 60 * 1000) {
       delete verificationRequests[chatId];
@@ -146,13 +134,21 @@ if (!verifiedUsers.has(chatId) && !isAdmin) {
     return;
   }
 
-  // ❓ Запитання
+  // ✍️ Відповідь оператором після натискання кнопки
+  if (isAdmin && currentReplyTarget) {
+    bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
+    bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
+
+    const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
+    if (index !== -1) pendingMessages.splice(index, 1);
+
+    currentReplyTarget = null;
+    return;
+  }
+
+  // ❓ Запитання користувача
   if (activeOrders[chatId]?.questionMode) {
-    pendingMessages.push({
-      chatId,
-      username: user.username,
-      text
-    });
+    pendingMessages.push({ chatId, username: user.username, text });
     delete activeOrders[chatId];
     bot.sendMessage(chatId, `✅ Ваше запитання надіслано оператору.`);
     bot.sendMessage(adminChatId, `❓ Запитання від @${user.username}:\n${text}`, {
@@ -163,7 +159,14 @@ if (!verifiedUsers.has(chatId) && !isAdmin) {
     return;
   }
 
-  // 🛒 Замовлення
+  // 🛒 Старт замовлення
+  if (text === '🛒 Зробити замовлення') {
+    activeOrders[chatId] = {};
+    bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
+    return;
+  }
+
+  // 🧾 Етапи замовлення
   const order = activeOrders[chatId];
   if (order) {
     if (!order.quantity) {
@@ -256,15 +259,10 @@ if (!verifiedUsers.has(chatId) && !isAdmin) {
     }
   }
 });
-// 💬 Обробка повідомлень
+
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
-  const isAdmin = chatId === adminChatId;
-  if (!text) return;
-  const user = users[chatId];
-
-
 // ℹ️ Інформація
 if (text === 'ℹ️ Інформація') {
   bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
@@ -281,11 +279,11 @@ if (text === 'ℹ️ Інформація') {
   return;
 }
 
-  // 🔙 Назад
-  if (text === '🔙 Назад') {
-    bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-    return;
-  }
+// 🔙 Назад
+if (text === '🔙 Назад') {
+  bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+  return;
+}
 
 // 🛠 Дія
 if (text === '🛠 Дія') {
@@ -320,7 +318,8 @@ if (text === '📝 Застосування') {
 // 💡 Клінічні випадки
 if (text === '💡 Клінічні випадки') {
   bot.sendDocument(chatId, './KioMedine Patient Cases_v2.0.0.pdf', {
-    caption: '📄 Клінічні випадки застосування препарату'
+    caption: '📄 Клінічні випадки застосування препарату',
+    contentType: 'application/pdf'
   });
   return;
 }
@@ -391,7 +390,6 @@ if (text === '📞 Зв’язатися з оператором') {
   return;
 }
 });
-
 bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
@@ -426,12 +424,6 @@ bot.on('callback_query', (query) => {
     bot.sendMessage(targetId, `🔓 Вам надано доступ до бота.`, getMainKeyboard(targetId));
     bot.sendMessage(adminChatId, `✅ Доступ надано користувачу @${users[targetId].username} (${targetId})`);
     bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
-    return;
-  }
-  // 🛒 Старт замовлення
-  if (text === '🛒 Зробити замовлення') {
-    activeOrders[chatId] = {};
-    bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
     return;
   }
 
