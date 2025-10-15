@@ -221,7 +221,7 @@ bot.on('message', (msg) => {
 
       bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
-      axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+      axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
         action: 'add',
         timestamp: order.timestamp,
         chatId: chatId,
@@ -362,7 +362,7 @@ if (text === '❌ Скасувати') {
   lastOrder.status = 'скасовано';
   bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
 
-  axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+  axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
     action: 'updateStatus',
     timestamp: lastOrder.timestamp,
     chatId: chatId,
@@ -389,6 +389,35 @@ if (text === '📞 Зв’язатися з оператором') {
   bot.sendContact(chatId, '+380932168041', 'Оператор');
   return;
 }
+
+if (isAdmin && pendingTTN[chatId]) {
+  const { targetId, timestamp } = pendingTTN[chatId];
+  const user = users[targetId];
+  const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
+  if (!order) {
+    bot.sendMessage(chatId, `⛔️ Замовлення не знайдено.`);
+    delete pendingTTN[chatId];
+    return;
+  }
+
+  order.ttn = text;
+  bot.sendMessage(targetId, `📦 Ваше замовлення відправлено!\nНомер ТТН: ${text}`);
+  bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
+
+  axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
+    action: 'updateTTN',
+    timestamp: order.timestamp,
+    chatId: targetId,
+    ttn: text
+  }).catch((err) => {
+    console.error('❌ Помилка оновлення ТТН:', err.message);
+    bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити ТТН: ${err.message}`);
+  });
+
+  delete pendingTTN[chatId];
+  return;
+}
+
 });
 bot.on('callback_query', (query) => {
   const data = query.data;
@@ -407,7 +436,7 @@ bot.on('callback_query', (query) => {
     users[targetId].verificationRequested = false;
     users[targetId].justVerified = true;
 
-    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
       action: 'addUser',
       timestamp: Date.now(),
       chatId: targetId,
@@ -441,7 +470,7 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -468,7 +497,7 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -493,6 +522,8 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id);
     return;
   }
+
+
 
   // ✍️ Відповідь оператором
   if (data.startsWith('reply_')) {
@@ -550,7 +581,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   }
 
   if (order.status !== 'прийнято') {
-    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbxTiAv4SGfmF6dF2XHFPerECnvSAoqGbmNnclEsealwEYEVL2GNKfU-pM8iX_VtttYd/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
