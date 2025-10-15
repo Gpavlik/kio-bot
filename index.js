@@ -428,6 +428,12 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
     return;
   }
+  // 🛒 Старт замовлення
+  if (text === '🛒 Зробити замовлення') {
+    activeOrders[chatId] = {};
+    bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
+    return;
+  }
 
   // ✅ Прийняти замовлення
   if (data.startsWith('accept_')) {
