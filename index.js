@@ -44,7 +44,9 @@ function safeSend(chatId, text, options) {
   }
 }
 bot.onText(/\/start/, (msg) => {
+
   const chatId = msg.chat.id;
+  const user = users[chatId];
   const isAdmin = chatId === adminChatId;
   const { first_name, username } = msg.from;
 
@@ -263,6 +265,7 @@ bot.on('message', (msg) => {
 
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
+   const user = users[chatId]; 
   const isAdmin = chatId === adminChatId;
   const text = msg.text;
 // ℹ️ Інформація
@@ -425,6 +428,7 @@ bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
   const isAdmin = chatId === adminChatId;
+   const user = users[chatId]; 
 
   // 🔐 Верифікація
   if (data.startsWith('verify_')) {
@@ -540,6 +544,7 @@ bot.on('callback_query', (query) => {
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
   const isAdmin = chatId === adminChatId;
+   const user = users[chatId]; 
   if (!isAdmin ) {
     bot.sendMessage(chatId, '⛔️ У вас немає доступу до панелі оператора.');
     return;
@@ -564,6 +569,7 @@ bot.onText(/\/reply (\d+) (.+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
   const isAdmin = chatId === adminChatId;
+   const user = users[chatId]; 
   const replyText = match[2];
   bot.sendMessage(targetId, `📩 Повідомлення від оператора:\n${replyText}`);
   bot.sendMessage(adminChatId, `✅ Відповідь надіслано.`);
@@ -609,6 +615,7 @@ bot.onText(/\/verify (\d+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
   const isAdmin = chatId === adminChatId;
+   const user = users[chatId]; 
   verifiedUsers.add(targetId);
   if (users[targetId]) users[targetId].verificationRequested = false;
   users[targetId].justVerified = true;
@@ -621,6 +628,7 @@ bot.onText(/\/unverify (\d+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
   const isAdmin = chatId === adminChatId;
+   const user = users[chatId]; 
   verifiedUsers.delete(targetId);
   bot.sendMessage(adminChatId, `🚫 Користувач ${targetId} більше не має доступу.`);
   bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
@@ -629,6 +637,7 @@ bot.onText(/\/unverify (\d+)/, (msg, match) => {
 // 📊 Статистика
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
+   const user = users[chatId]; 
   const text = msg.text;
   const isAdmin = chatId === adminChatId;
 
