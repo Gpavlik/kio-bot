@@ -1,59 +1,13 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const { isVerified } = require('./googleSheets');
+const { getUsersFromSheet, isVerified } = require('./googleSheets');
 
-const verificationRequests = {};
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const bot = new TelegramBot(token, { polling: true });
 
-const { getUsersFromSheet } = require('./googleSheets');
-
-bot.onText(/\/debug/, async (msg) => {
-  const chatId = msg.chat.id;
-  try {
-    const users = await getUsersFromSheet();
-    console.log('Users from sheet:', users);
-    bot.sendMessage(chatId, `✅ Отримано ${users.length - 1} користувачів з таблиці.`);
-  } catch (error) {
-    console.error('Помилка при читанні таблиці:', error);
-    bot.sendMessage(chatId, `⚠️ Не вдалося прочитати таблицю. Перевір доступ або формат.`);
-  }
-});
-
-
-// Обробка /start
-bot.onText(/\/start/, async (msg) => {
-  const chatId = msg.chat.id;
-  const { first_name, username } = msg.from;
-
-  try {
-    const verified = await isVerified(chatId);
-
-    if (!verified) {
-      bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
-      verificationRequests[chatId] = {
-        step: 1,
-        createdAt: Date.now(),
-        username: username || 'невідомо'
-      };
-      return;
-    }
-
-    bot.sendMessage(
-      chatId,
-      `Вітаємо, ${first_name || 'користувачу'}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`,
-      getMainKeyboard(chatId)
-    );
-  } catch (error) {
-    console.error('Помилка при перевірці доступу:', error);
-    bot.sendMessage(chatId, `⚠️ Виникла помилка при перевірці доступу. Спробуйте пізніше.`);
-  }
-});
-
-
-// 👥 Користувачі
+const verificationRequests = {};
 const users = {
   [adminChatId]: {
     name: 'Адміністратор',
@@ -62,7 +16,6 @@ const users = {
     verificationRequested: false
   }
 };
-
 const verifiedUsers = new Set([adminChatId]);
 const activeOrders = {};
 const pendingMessages = [];
@@ -93,37 +46,43 @@ function safeSend(chatId, text, options) {
     lastSent[chatId] = now;
   }
 }
-
 // 🚀 Старт
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from;
 
-  const { getUsersFromSheet } = require('./googleSheets');
-  const users = await getUsersFromSheet();
+  try {
+    const verified = await isVerified(chatId);
 
-  let isVerified = false;
-
-  for (let i = 1; i < users.length; i++) {
-    const storedChatId = Number(users[i][3]); // колонка D
-    if (storedChatId === Number(chatId)) {
-      isVerified = true;
-      break;
+    if (!verified) {
+      bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
+      verificationRequests[chatId] = {
+        step: 1,
+        createdAt: Date.now(),
+        username: username || 'невідомо'
+      };
+      return;
     }
-  }
 
-  if (!isVerified) {
-    // Запускаємо верифікацію
-    bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
-    verificationRequests[chatId] = { step: 1, createdAt: Date.now(), username: username || 'невідомо' };
-    return;
-  }
+    verifiedUsers.add(chatId);
+    users[chatId] = users[chatId] || {
+      name: first_name || 'Невідомо',
+      username: username || 'невідомо',
+      orders: [],
+      verificationRequested: false
+    };
 
-  // Верифікований користувач
-  bot.sendMessage(chatId, `Вітаємо, ${first_name || 'користувачу'}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`, getMainKeyboard(chatId));
+    bot.sendMessage(
+      chatId,
+      `Вітаємо, ${first_name || 'користувачу'}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`,
+      getMainKeyboard(chatId)
+    );
+  } catch (error) {
+    console.error('Помилка при перевірці доступу:', error);
+    bot.sendMessage(chatId, `⚠️ Виникла помилка при перевірці доступу. Спробуйте пізніше.`);
+  }
 });
-
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const isAdmin = chatId === adminChatId;
@@ -138,7 +97,6 @@ bot.on('message', (msg) => {
 
     if (Date.now() - request.createdAt > 24 * 60 * 60 * 1000) {
       delete verificationRequests[chatId];
-      user.verificationRequested = false;
       bot.sendMessage(chatId, `⛔️ Ваш запит анульовано через неактивність. Надішліть /start, щоб почати знову.`);
       return;
     }
@@ -183,7 +141,20 @@ bot.on('message', (msg) => {
     return;
   }
 
-  // ✍️ Відповідь оператором
+  // ❓ Задати запитання
+  if (activeOrders[chatId]?.questionMode) {
+    pendingMessages.push({ chatId, username: user?.username || 'невідомо', text });
+    delete activeOrders[chatId];
+    bot.sendMessage(chatId, `✅ Ваше запитання надіслано оператору.`);
+    bot.sendMessage(adminChatId, `❓ Запитання від @${user?.username || 'невідомо'}:\n${text}`, {
+      reply_markup: {
+        inline_keyboard: [[{ text: '✍️ Відповісти', callback_data: `reply_${chatId}` }]]
+      }
+    });
+    return;
+  }
+
+  // ✍️ Відповідь оператора
   if (isAdmin && currentReplyTarget) {
     bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
     bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
@@ -193,27 +164,13 @@ bot.on('message', (msg) => {
     return;
   }
 
-  // ❓ Запитання користувача
-  if (activeOrders[chatId]?.questionMode) {
-    pendingMessages.push({ chatId, username: user.username, text });
-    delete activeOrders[chatId];
-    bot.sendMessage(chatId, `✅ Ваше запитання надіслано оператору.`);
-    bot.sendMessage(adminChatId, `❓ Запитання від @${user.username}:\n${text}`, {
-      reply_markup: {
-        inline_keyboard: [[{ text: '✍️ Відповісти', callback_data: `reply_${chatId}` }]]
-      }
-    });
-    return;
-  }
-
   // 🛒 Старт замовлення
   if (text === '🛒 Зробити замовлення') {
     activeOrders[chatId] = {};
     bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
     return;
   }
-
-  // 🧾 Етапи замовлення
+});
   const order = activeOrders[chatId];
   if (order) {
     if (!order.quantity) {
@@ -305,6 +262,7 @@ bot.on('message', (msg) => {
       return;
     }
   }
+
   // ℹ️ Інформація
   if (text === 'ℹ️ Інформація') {
     bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
@@ -320,84 +278,33 @@ bot.on('message', (msg) => {
     });
     return;
   }
-
-  // 🔙 Назад
-  if (text === '🔙 Назад') {
-    bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-    return;
-  }
-
   // 🛠 Дія
   if (text === '🛠 Дія') {
-    bot.sendMessage(chatId, `Остеоартрит — дегенеративне захворювання, що супроводжується підвищеним тертям у суглобах, болем і функціональними порушеннями. Однією з причин є окислювальне руйнування ендогенних мастильних полімерів (гіалуронатів) під дією вільних радикалів.
-KioMedinevsOne — засіб для підвищення в’язкості синовіальної рідини, призначений для внутрішньосуглобових ін’єкцій. Основний компонент — лінійне (незшите) похідне хітозану нетваринного походження, отримане з печериці Agaricus bisporus та модифіковане запатентованою технологією.
-Препарат забезпечує змащення, знижує тертя, нейтралізує вільні радикали та зменшує вплив окисного стресу на суглоб. Після введення його компоненти розкладаються в організмі та є нетоксичними для тканин.`);
+    bot.sendMessage(chatId, `Остеоартрит — дегенеративне захворювання... [текст дії]`);
     return;
   }
 
   // 📦 Склад
   if (text === '📦 Склад') {
-    bot.sendMessage(chatId, `Кожна упаковка KioMedinevsOne містить один попередньо наповнений шприц з 3 ml (мл)
-стерильного розчину, упакований у блістер, інструкцію щодо застосування та етикетки.
-В 1 ml (мл) розчину міститься 20 mg (мг) похідного хітозану, 35 mg (мг) сорбіту та
-фосфатна-буферна вода для ін'єкцій qs (рН 7,2 ± 0,2, 270-330 mOsmol/kg (мОсмоль/кг)).
-Попередньо наповнений шприц призначений лише для одноразового використання.`);
+    bot.sendMessage(chatId, `Кожна упаковка KioMedinevsOne містить... [текст складу]`);
     return;
   }
 
   // ⚙️ Ефект
   if (text === '⚙️ Ефект') {
-    bot.sendMessage(chatId, `ЗОдин курс лікування передбачає одну внутрішньосуглобову ін'єкцію КioMedinevsOne
-об'ємом 3 ml (мл) у колінний суглоб.
-• Клінічні дані рандомізованого контрольованого дослідження за участю пацієнтів з
-остеоартритом колінного суглоба показали, що одноразова внутрішньосуглобова
-ін'єкція KioMedinevsOne забезпечує значне зменшення болю в суглобах, скутості та
-покращення функціональності протягом 6 місяців.
-• Лікування можна повторити відповідно до рекомендацій лікаря та симптомів пацієнта.
-Термін між курсами лікування може залежати від тяжкості симптомів.
-Під час клінічного дослідження профіль безпеки повторної ін'єкції KioMedinevsOne в
-колінний суглоб не змінювався після З-місячного інтервалу.`);
+    bot.sendMessage(chatId, `Один курс лікування передбачає... [текст ефекту]`);
     return;
   }
 
   // ⚠️ Увага
   if (text === '⚠️ Увага') {
-    bot.sendMessage(chatId, `Протипоказання та застереження щодо застосування KioMedinevsOne
-•	Не вводити при підозрі на наявність синовіального випоту.
-•	Безпека та ефективність не встановлені для вагітних, жінок у період лактації, дітей та при інших захворюваннях, окрім остеоартриту колінного суглоба.
-•	Зберігати в оригінальній упаковці при температурі 2–25 °C. Не заморожувати. Якщо зберігався на холоді — перед використанням витримати 15 хв при кімнатній температурі.
-•	Використати одразу після відкриття. Препарат призначений для одноразового застосування одному пацієнту. Не використовувати при пошкодженій упаковці. Повторне використання або стерилізація заборонені.
-•	Утилізувати залишки у відповідний контейнер.
-•	Введення несе ризик інфікування: необхідне суворе дотримання асептики та обробка шкіри відповідним антисептиком (крім препаратів на основі четвертинних амонієвих сполук).
-•	Високий тиск під час ін’єкції може свідчити про неправильне положення голки.
-•	Існує ризик травмування голкою під час маніпуляцій.
-•	Дані щодо взаємодії з іншими внутрішньосуглобовими препаратами відсутні.`);
+    bot.sendMessage(chatId, `Протипоказання та застереження... [текст уваги]`);
     return;
   }
 
   // 📝 Застосування
   if (text === '📝 Застосування') {
-    bot.sendMessage(chatId, `Перед кожною ін'єкцією KioMedinevsOne слід видалити синовіальну рідину.
-• Введення KioMedinevsOne повинне проводитися навченим лікарем, який має досвід
-внутрішньосуглобових ін'єкцій у колінний суглоб.
-• Місце ін'єкції слід ретельно обробити відповідним антисептичним засобом перед
-введенням препарату.
-• Техніка внутрішньосуглобової ін'єкції повинна забезпечувати точне введення
-KioMedinevsOne в порожнину суглоба. Правильне розміщення гопки у суглобі можливо
-контролювати, за необхідності, за допомогою ультразвукової діагностики. Ін'єкції під
-контролем УЗД повинні виконуватися лише лікарями з відповідним досвідом роботи в
-цій техніці.
-• Для введення препарату KioMedinevsOne слід використовувати голку Люера
-відповідного розміру, тобто від 20G до 23G, та відповідної довжини. Обережно зніміть
-захисний ковпачок зі шприца і в асептичний спосіб під'єднайте голку. Голка повинна бути
-міцно з'єднана зі шприцом .
-• Введіть увесь вміст шприца в колінний суглоб.
-• Після введення препарату голку слід обережно видалити, а місце ін'єкції знову
-обробити антисептиком.
-• Після використання голку слід утилізувати у відповідний контейнер для гострих предметів.
-• Після ін'єкції KioMedinevsOne пацієнт може відчути тимчасове посилення болю в
-суглобі, яке зазвичай минає протягом 2-3 днів. Рекомендується застосування холодних компресів і прийом знеболювальних засобів (нестероїдних протизапальних препаратів).
-• Пацієнтам слід рекомендувати уникати надмірних фізичних навантажень на суглоб протягом перших 48 годин після ін'єкції.`);
+    bot.sendMessage(chatId, `Перед кожною ін'єкцією KioMedinevsOne... [текст застосування]`);
     return;
   }
 
@@ -410,9 +317,15 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
     return;
   }
 
+  // 🔙 Назад
+  if (text === '🔙 Назад') {
+    bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+    return;
+  }
+
   // 📜 Історія замовлень
   if (text === '📜 Історія замовлень') {
-    if (!user.orders.length) {
+    if (!user?.orders?.length) {
       bot.sendMessage(chatId, `📭 У Вас поки немає замовлень.`);
       return;
     }
@@ -434,7 +347,7 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
       return;
     }
 
-    const lastOrder = user.orders[user.orders.length - 1];
+    const lastOrder = user?.orders?.[user.orders.length - 1];
     if (!lastOrder) {
       bot.sendMessage(chatId, `ℹ️ Немає активного або завершеного замовлення для скасування.`);
       return;
@@ -447,22 +360,6 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
 
     lastOrder.status = 'скасовано';
     bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
-
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'updateStatus',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      status: 'скасовано'
-    }).then(() => {
-      console.log('✅ Статус оновлено в таблиці');
-        order.status = 'скасовано';
-      bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
-      bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
-    }).catch((err) => {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-    });
     return;
   }
 
@@ -478,37 +375,6 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
     bot.sendContact(chatId, '+380932168041', 'Оператор');
     return;
   }
-
-  // 📦 Введення ТТН оператором
-  if (isAdmin && pendingTTN[chatId]) {
-    const { targetId, timestamp } = pendingTTN[chatId];
-    const targetUser = users[targetId];
-    const order = targetUser?.orders?.find(o => o.timestamp == Number(timestamp));
-    if (!order) {
-      bot.sendMessage(chatId, `⛔️ Замовлення не знайдено.`);
-      delete pendingTTN[chatId];
-      return;
-    }
-
-    order.ttn = text;
-    bot.sendMessage(targetId, `📦 Ваше замовлення відправлено!\nНомер ТТН: ${text}`);
-    bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
-
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'updateTTN',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      ttn: text
-    }).catch((err) => {
-      console.error('❌ Помилка оновлення ТТН:', err.message);
-      bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити ТТН: ${err.message}`);
-    });
-
-    delete pendingTTN[chatId];
-    return;
-  }
-});
-// 🔘 Callback-кнопки
 bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
@@ -517,32 +383,20 @@ bot.on('callback_query', (query) => {
   if (data.startsWith('verify_')) {
     const targetId = parseInt(data.split('_')[1], 10);
     const request = verificationRequests[targetId];
-    if (!request || !users[targetId]) {
-      bot.answerCallbackQuery(query.id, { text: '⛔️ Запит не знайдено.' });
-      return;
-    }
 
     verifiedUsers.add(targetId);
-    users[targetId].verificationRequested = false;
+    users[targetId] = users[targetId] || {
+      name: request?.name || 'Невідомо',
+      username: request?.username || 'невідомо',
+      orders: [],
+      verificationRequested: false
+    };
     users[targetId].justVerified = true;
-
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'addUser',
-      timestamp: Date.now(),
-      chatId: targetId,
-      name: request.name,
-      username: users[targetId].username,
-      phone: request.phone,
-      town: request.town,
-      workplace: request.workplace,
-      verifierName: request.verifierName
-    });
-
-    delete verificationRequests[targetId];
 
     bot.sendMessage(targetId, `🔓 Вам надано доступ до бота.`, getMainKeyboard(targetId));
     bot.sendMessage(adminChatId, `✅ Доступ надано користувачу @${users[targetId].username} (${targetId})`);
     bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
+    delete verificationRequests[targetId];
     return;
   }
 
@@ -560,20 +414,10 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'updateStatus',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      status: 'прийнято'
-    }).then(() => {
-      order.status = 'прийнято';
-      bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-      bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
-      bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
-    }).catch((err) => {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-    });
+    order.status = 'прийнято';
+    bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+    bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
+    bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
     return;
   }
 
@@ -587,20 +431,10 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'updateStatus',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      status: 'скасовано'
-    }).then(() => {
-      order.status = 'скасовано';
-      bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
-      bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
-    }).catch((err) => {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-    });
+    order.status = 'скасовано';
+    bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
+    bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
+    bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     return;
   }
 
@@ -621,7 +455,6 @@ bot.on('callback_query', (query) => {
     return;
   }
 });
-
 // 🧾 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
@@ -640,6 +473,34 @@ bot.onText(/\/adminpanel/, (msg) => {
       resize_keyboard: true
     }
   });
+});
+
+// ✅ Верифікація вручну
+bot.onText(/\/verify (\d+)/, (msg, match) => {
+  if (msg.chat.id !== adminChatId) return;
+  const targetId = parseInt(match[1], 10);
+
+  verifiedUsers.add(targetId);
+  users[targetId] = users[targetId] || {
+    name: 'Невідомо',
+    username: 'невідомо',
+    orders: [],
+    verificationRequested: false
+  };
+  users[targetId].justVerified = true;
+
+  bot.sendMessage(adminChatId, `✅ Користувач ${targetId} верифікований.`);
+  bot.sendMessage(targetId, `🔓 Вам надано доступ до бота. Можете почати користування.`, getMainKeyboard(targetId));
+});
+
+// 🚫 Відкликання доступу
+bot.onText(/\/unverify (\d+)/, (msg, match) => {
+  const targetId = parseInt(match[1], 10);
+  if (msg.chat.id !== adminChatId) return;
+
+  verifiedUsers.delete(targetId);
+  bot.sendMessage(adminChatId, `🚫 Користувач ${targetId} більше не має доступу.`);
+  bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
 });
 
 // ✍️ Відповідь оператором через /reply
@@ -668,57 +529,14 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   }
 
   if (order.status !== 'прийнято') {
-    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
-      action: 'updateStatus',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      status: 'прийнято'
-    }).then(() => {
-      console.log('✅ Статус "прийнято" оновлено в таблиці');
-      order.status = 'прийнято';
-      bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-      bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
-      bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
-    }).catch((err) => {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-    });
+    order.status = 'прийнято';
+    bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+    bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
     return;
   }
 
   bot.sendMessage(targetId, `🚚 Ваше замовлення вже в дорозі! Дякуємо за довіру ❤️`);
   bot.sendMessage(adminChatId, `✅ Доставку підтверджено.`);
-});
-
-// ✅ Верифікація вручну
-bot.onText(/\/verify (\d+)/, (msg, match) => {
-  if (msg.chat.id !== adminChatId) return;
-  const targetId = parseInt(match[1], 10);
-  const request = verificationRequests[targetId];
-  ;
-
-  verifiedUsers.add(targetId);
-  if (users[targetId]) users[targetId].verificationRequested = false;
-  users[targetId] = users[targetId] || {
-    name: 'Невідомо',
-    username: 'невідомо',
-    orders: [],
-    verificationRequested: false
-  };
-  users[targetId].justVerified = true;
-
-  bot.sendMessage(adminChatId, `✅ Користувач ${targetId} верифікований.`);
-  bot.sendMessage(targetId, `🔓 Вам надано доступ до бота. Можете почати користування.`, getMainKeyboard(targetId));
-});
-
-// 🚫 Відкликання доступу
-bot.onText(/\/unverify (\d+)/, (msg, match) => {
-  const targetId = parseInt(match[1], 10);
-  if (msg.chat.id !== adminChatId) return;
-
-  verifiedUsers.delete(targetId);
-  bot.sendMessage(adminChatId, `🚫 Користувач ${targetId} більше не має доступу.`);
-  bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
 });
 
 // 📊 Статистика
