@@ -1,7 +1,7 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-
+const verificationRequests = {};
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const bot = new TelegramBot(token, { polling: true });
@@ -33,7 +33,6 @@ const users = {
 };
 
 const verifiedUsers = new Set([adminChatId]);
-const verificationRequests = {};
 const activeOrders = {};
 const pendingMessages = [];
 const pendingTTN = {};
