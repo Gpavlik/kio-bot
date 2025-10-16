@@ -49,37 +49,34 @@ function safeSend(chatId, text, options) {
 }
 
 // 🚀 Старт
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from;
 
-  if (!users[chatId]) {
-    users[chatId] = {
-      name: first_name || 'Невідомо',
-      username: username || 'невідомо',
-      orders: [],
-      verificationRequested: false
-    };
-  }
+  const sheet = googleSheets.getSheetByName('Users');
+  const rows = sheet.getDataRange().getValues();
 
-  if (users[chatId].justVerified) {
-    users[chatId].justVerified = false;
-    return;
-  }
+  let isVerified = false;
 
-  if (!verifiedUsers.has(chatId)) {
-    if (!users[chatId].verificationRequested) {
-      users[chatId].verificationRequested = true;
-      verificationRequests[chatId] = { step: 1, createdAt: Date.now() };
-      bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
-    } else {
-      bot.sendMessage(chatId, `⏳ Очікуйте підтвердження доступу від оператора...`);
+  for (let i = 1; i < rows.length; i++) {
+    const storedChatId = Number(rows[i][3]); // колонка D
+    if (storedChatId === Number(chatId)) {
+      isVerified = true;
+      break;
     }
+  }
+
+  if (!isVerified) {
+    // Запускаємо верифікацію
+    bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
+    verificationRequests[chatId] = { step: 1, createdAt: Date.now(), username: username || 'невідомо' };
     return;
   }
 
-  bot.sendMessage(chatId, `Вітаємо, ${first_name}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`, getMainKeyboard(chatId));
+  // Верифікований користувач
+  bot.sendMessage(chatId, `Вітаємо, ${first_name || 'користувачу'}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`, getMainKeyboard(chatId));
 });
+
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
