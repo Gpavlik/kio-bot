@@ -86,13 +86,13 @@ bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from;
 
-  const sheet = googleSheets.getSheetByName('Users');
-  const rows = sheet.getDataRange().getValues();
+  const { getUsersFromSheet } = require('./googleSheets');
+  const users = await getUsersFromSheet();
 
   let isVerified = false;
 
-  for (let i = 1; i < rows.length; i++) {
-    const storedChatId = Number(rows[i][3]); // колонка D
+  for (let i = 1; i < users.length; i++) {
+    const storedChatId = Number(users[i][3]); // колонка D
     if (storedChatId === Number(chatId)) {
       isVerified = true;
       break;
