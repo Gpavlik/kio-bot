@@ -4,7 +4,9 @@ const axios = require('axios');
 
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
+const bot = new TelegramBot(token, { polling: true });
 
+// 👥 Користувачі
 const users = {
   [adminChatId]: {
     name: 'Адміністратор',
@@ -14,8 +16,6 @@ const users = {
   }
 };
 
-const bot = new TelegramBot(token, { polling: true });
-
 const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
 const activeOrders = {};
@@ -23,6 +23,8 @@ const pendingMessages = [];
 const pendingTTN = {};
 let currentReplyTarget = null;
 const lastSent = {};
+
+// 🎛️ Головна клавіатура
 function getMainKeyboard(chatId) {
   if (!verifiedUsers.has(chatId)) return undefined;
   return {
@@ -37,6 +39,7 @@ function getMainKeyboard(chatId) {
   };
 }
 
+// 🕒 Захист від спаму
 function safeSend(chatId, text, options) {
   const now = Date.now();
   if (!lastSent[chatId] || now - lastSent[chatId] > 5000) {
@@ -44,11 +47,10 @@ function safeSend(chatId, text, options) {
     lastSent[chatId] = now;
   }
 }
-bot.onText(/\/start/, (msg) => {
 
+// 🚀 Старт
+bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  const user = users[chatId];
-  const isAdmin = chatId === adminChatId;
   const { first_name, username } = msg.from;
 
   if (!users[chatId]) {
@@ -138,14 +140,12 @@ bot.on('message', (msg) => {
     return;
   }
 
-  // ✍️ Відповідь оператором після натискання кнопки
+  // ✍️ Відповідь оператором
   if (isAdmin && currentReplyTarget) {
     bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
     bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
-
     const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
     if (index !== -1) pendingMessages.splice(index, 1);
-
     currentReplyTarget = null;
     return;
   }
@@ -262,174 +262,166 @@ bot.on('message', (msg) => {
       return;
     }
   }
-});
+  // ℹ️ Інформація
+  if (text === 'ℹ️ Інформація') {
+    bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
+      reply_markup: {
+        keyboard: [
+          ['🛠 Дія', '📦 Склад'],
+          ['⚙️ Ефект', '⚠️ Увага'],
+          ['💡 Клінічні випадки'],
+          ['📝 Застосування', '🔙 Назад']
+        ],
+        resize_keyboard: true
+      }
+    });
+    return;
+  }
 
-bot.on('message', (msg) => {
-  const chatId = msg.chat.id;
-   const user = users[chatId]; 
-  const isAdmin = chatId === adminChatId;
-  const text = msg.text;
-// ℹ️ Інформація
-if (text === 'ℹ️ Інформація') {
-  bot.sendMessage(chatId, `KioMedinevsOne — медичний виріб для віскосуплементації синовіальної рідини при симптоматичному лікуванні остеоартриту колінного суглоба.`, {
-    reply_markup: {
-      keyboard: [
-        ['🛠 Дія', '📦 Склад'],
-        ['⚙️ Ефект', '⚠️ Увага'],
-        ['💡 Клінічні випадки'],
-        ['📝 Застосування', '🔙 Назад']
-      ],
-      resize_keyboard: true
+  // 🔙 Назад
+  if (text === '🔙 Назад') {
+    bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+    return;
+  }
+
+  // 🛠 Дія
+  if (text === '🛠 Дія') {
+    bot.sendMessage(chatId, `Остеоартрит — дегенеративне захворювання, що супроводжується зниженням в'язкості синовіальної рідини. KioMedinevsOne відновлює її захисні властивості.`);
+    return;
+  }
+
+  // 📦 Склад
+  if (text === '📦 Склад') {
+    bot.sendMessage(chatId, `1 мл гелю містить: 2,5% гіалуронової кислоти, 97,5% води для ін'єкцій. Без консервантів.`);
+    return;
+  }
+
+  // ⚙️ Ефект
+  if (text === '⚙️ Ефект') {
+    bot.sendMessage(chatId, `Зменшення болю, покращення рухливості, зниження запалення. Ефект триває до 6 місяців після ін'єкції.`);
+    return;
+  }
+
+  // ⚠️ Увага
+  if (text === '⚠️ Увага') {
+    bot.sendMessage(chatId, `Не застосовувати при інфекціях суглоба, алергії на гіалуронат, вагітності або лактації без консультації лікаря.`);
+    return;
+  }
+
+  // 📝 Застосування
+  if (text === '📝 Застосування') {
+    bot.sendMessage(chatId, `Ін'єкція вводиться внутрішньосуглобово 1 раз на тиждень. Повний курс — 3 ін'єкції.`);
+    return;
+  }
+
+  // 💡 Клінічні випадки
+  if (text === '💡 Клінічні випадки') {
+    bot.sendDocument(chatId, './KioMedine Patient Cases_v2.0.0.pdf', {
+      caption: '📄 Клінічні випадки застосування препарату',
+      contentType: 'application/pdf'
+    });
+    return;
+  }
+
+  // 📜 Історія замовлень
+  if (text === '📜 Історія замовлень') {
+    if (!user.orders.length) {
+      bot.sendMessage(chatId, `📭 У Вас поки немає замовлень.`);
+      return;
     }
-  });
-  return;
-}
 
-// 🔙 Назад
-if (text === '🔙 Назад') {
-  bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-  return;
-}
+    let historyText = `🕘 Історія Ваших замовлень:\n\n`;
+    user.orders.forEach((order, index) => {
+      historyText += `#${index + 1}\n📦 ${order.quantity} шт\n🏙 ${order.city}\n🏠 ${order.address}\n📮 НП: ${order.np}\n📞 ${order.phone}\n📌 Статус: ${order.status || 'очікує'}\n\n`;
+    });
 
-// 🛠 Дія
-if (text === '🛠 Дія') {
-  bot.sendMessage(chatId, `Остеоартрит — дегенеративне захворювання... [текст повний, як у твоєму коді]`);
-  return;
-}
-
-// 📦 Склад
-if (text === '📦 Склад') {
-  bot.sendMessage(chatId, `Кожна упаковка KioMedinevsOne містить... [текст повний]`);
-  return;
-}
-
-// ⚙️ Ефект
-if (text === '⚙️ Ефект') {
-  bot.sendMessage(chatId, `Один курс лікування передбачає... [текст повний]`);
-  return;
-}
-
-// ⚠️ Увага
-if (text === '⚠️ Увага') {
-  bot.sendMessage(chatId, `• Протипоказання та застереження... [текст повний]`);
-  return;
-}
-
-// 📝 Застосування
-if (text === '📝 Застосування') {
-  bot.sendMessage(chatId, `Перед кожною ін'єкцією KioMedinevsOne... [текст повний]`);
-  return;
-}
-
-// 💡 Клінічні випадки
-if (text === '💡 Клінічні випадки') {
-  bot.sendDocument(chatId, './KioMedine Patient Cases_v2.0.0.pdf', {
-    caption: '📄 Клінічні випадки застосування препарату',
-    contentType: 'application/pdf'
-  });
-  return;
-}
-
-// 📜 Історія замовлень
-if (text === '📜 Історія замовлень') {
-  if (!user.orders.length) {
-    bot.sendMessage(chatId, `📭 У Вас поки немає замовлень.`);
+    bot.sendMessage(chatId, historyText);
     return;
   }
 
-  let historyText = `🕘 Історія Ваших замовлень:\n\n`;
-  user.orders.forEach((order, index) => {
-    historyText += `#${index + 1}\n📦 ${order.quantity} шт\n🏙 ${order.city}\n🏠 ${order.address}\n📮 НП: ${order.np}\n📞 ${order.phone}\n📌 Статус: ${order.status || 'очікує'}\n\n`;
-  });
+  // ❌ Скасувати
+  if (text === '❌ Скасувати') {
+    if (activeOrders[chatId]) {
+      delete activeOrders[chatId];
+      bot.sendMessage(chatId, `⛔️ Замовлення скасовано до завершення.`);
+      return;
+    }
 
-  bot.sendMessage(chatId, historyText);
-  return;
-}
+    const lastOrder = user.orders[user.orders.length - 1];
+    if (!lastOrder) {
+      bot.sendMessage(chatId, `ℹ️ Немає активного або завершеного замовлення для скасування.`);
+      return;
+    }
 
-// ❌ Скасувати
-if (text === '❌ Скасувати') {
-  if (activeOrders[chatId]) {
-    delete activeOrders[chatId];
-    bot.sendMessage(chatId, `⛔️ Замовлення скасовано до завершення.`);
+    if (lastOrder.status === 'прийнято') {
+      bot.sendMessage(chatId, `⛔️ Прийняте замовлення не можна скасувати.`);
+      return;
+    }
+
+    lastOrder.status = 'скасовано';
+    bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
+
+    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+      action: 'updateStatus',
+      timestamp: lastOrder.timestamp,
+      chatId: chatId,
+      status: 'скасовано'
+    }).then(() => {
+      console.log('✅ Статус оновлено в таблиці');
+      bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
+    }).catch((err) => {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити статус: ${err.message}`);
+    });
     return;
   }
 
-  const lastOrder = user.orders[user.orders.length - 1];
-  if (!lastOrder) {
-    bot.sendMessage(chatId, `ℹ️ Немає активного або завершеного замовлення для скасування.`);
+  // ❓ Задати запитання
+  if (text === '❓ Задати запитання') {
+    bot.sendMessage(chatId, `✍️ Напишіть своє запитання, і оператор відповість найближчим часом.`);
+    activeOrders[chatId] = { questionMode: true };
     return;
   }
 
-  if (lastOrder.status === 'прийнято') {
-    bot.sendMessage(chatId, `⛔️ Прийняте замовлення не можна скасувати.`);
+  // 📞 Зв’язатися з оператором
+  if (text === '📞 Зв’язатися з оператором') {
+    bot.sendContact(chatId, '+380932168041', 'Оператор');
     return;
   }
 
-  lastOrder.status = 'скасовано';
-  bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
+  // 📦 Введення ТТН оператором
+  if (isAdmin && pendingTTN[chatId]) {
+    const { targetId, timestamp } = pendingTTN[chatId];
+    const targetUser = users[targetId];
+    const order = targetUser?.orders?.find(o => o.timestamp == Number(timestamp));
+    if (!order) {
+      bot.sendMessage(chatId, `⛔️ Замовлення не знайдено.`);
+      delete pendingTTN[chatId];
+      return;
+    }
 
-  axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
-    action: 'updateStatus',
-    timestamp: lastOrder.timestamp,
-    chatId: chatId,
-    status: 'скасовано'
-  }).then(() => {
-    console.log('✅ Статус оновлено в таблиці');
-    bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
-  }).catch((err) => {
-    console.error('❌ Помилка оновлення статусу:', err.message);
-    bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити статус: ${err.message}`);
-  });
-  return;
-}
+    order.ttn = text;
+    bot.sendMessage(targetId, `📦 Ваше замовлення відправлено!\nНомер ТТН: ${text}`);
+    bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
 
-// ❓ Задати запитання
-if (text === '❓ Задати запитання') {
-  bot.sendMessage(chatId, `✍️ Напишіть своє запитання, і оператор відповість найближчим часом.`);
-  activeOrders[chatId] = { questionMode: true };
-  return;
-}
+    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+      action: 'updateTTN',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      ttn: text
+    }).catch((err) => {
+      console.error('❌ Помилка оновлення ТТН:', err.message);
+      bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити ТТН: ${err.message}`);
+    });
 
-// 📞 Зв’язатися з оператором
-if (text === '📞 Зв’язатися з оператором') {
-  bot.sendContact(chatId, '+380932168041', 'Оператор');
-  return;
-}
-
-if (isAdmin && pendingTTN[chatId]) {
-  const { targetId, timestamp } = pendingTTN[chatId];
-  const user = users[targetId];
-  const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
-  if (!order) {
-    bot.sendMessage(chatId, `⛔️ Замовлення не знайдено.`);
     delete pendingTTN[chatId];
     return;
   }
-
-  order.ttn = text;
-  bot.sendMessage(targetId, `📦 Ваше замовлення відправлено!\nНомер ТТН: ${text}`);
-  bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
-
-  axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
-    action: 'updateTTN',
-    timestamp: order.timestamp,
-    chatId: targetId,
-    ttn: text
-  }).catch((err) => {
-    console.error('❌ Помилка оновлення ТТН:', err.message);
-    bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити ТТН: ${err.message}`);
-  });
-
-  delete pendingTTN[chatId];
-  return;
-}
-
 });
+// 🔘 Callback-кнопки
 bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
-  const isAdmin = chatId === adminChatId;
-   const user = users[chatId]; 
 
   // 🔐 Верифікація
   if (data.startsWith('verify_')) {
@@ -531,8 +523,6 @@ bot.on('callback_query', (query) => {
     return;
   }
 
-
-
   // ✍️ Відповідь оператором
   if (data.startsWith('reply_')) {
     currentReplyTarget = parseInt(data.split('_')[1], 10);
@@ -541,17 +531,16 @@ bot.on('callback_query', (query) => {
     return;
   }
 });
+
 // 🧾 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
-  const isAdmin = chatId === adminChatId;
-   const user = users[chatId]; 
-  if (!isAdmin ) {
+  if (chatId !== adminChatId) {
     bot.sendMessage(chatId, '⛔️ У вас немає доступу до панелі оператора.');
     return;
   }
 
-  const adminKeyboard = {
+  bot.sendMessage(chatId, `👨‍💼 Панель оператора активна. Оберіть дію:`, {
     reply_markup: {
       keyboard: [
         ['📋 Переглянути всі замовлення'],
@@ -560,17 +549,13 @@ bot.onText(/\/adminpanel/, (msg) => {
       ],
       resize_keyboard: true
     }
-  };
-
-  bot.sendMessage(chatId, `👨‍💼 Панель оператора активна. Оберіть дію:`, adminKeyboard);
+  });
 });
 
 // ✍️ Відповідь оператором через /reply
 bot.onText(/\/reply (\d+) (.+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
-  const isAdmin = chatId === adminChatId;
-   const user = users[chatId]; 
   const replyText = match[2];
   bot.sendMessage(targetId, `📩 Повідомлення від оператора:\n${replyText}`);
   bot.sendMessage(adminChatId, `✅ Відповідь надіслано.`);
@@ -580,7 +565,6 @@ bot.onText(/\/reply (\d+) (.+)/, (msg, match) => {
 bot.onText(/\/send (\d+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
-  const isAdmin = chatId === adminChatId;
   const user = users[targetId];
   if (!user || !user.orders || user.orders.length === 0) {
     bot.sendMessage(adminChatId, `⛔️ Замовлення не знайдено.`);
@@ -615,21 +599,28 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
 bot.onText(/\/verify (\d+)/, (msg, match) => {
   if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
-  const isAdmin = chatId === adminChatId;
-   const user = users[chatId]; 
+  const request = verificationRequests[targetId];
+  ;
+
   verifiedUsers.add(targetId);
   if (users[targetId]) users[targetId].verificationRequested = false;
+  users[targetId] = users[targetId] || {
+    name: 'Невідомо',
+    username: 'невідомо',
+    orders: [],
+    verificationRequested: false
+  };
   users[targetId].justVerified = true;
+
   bot.sendMessage(adminChatId, `✅ Користувач ${targetId} верифікований.`);
   bot.sendMessage(targetId, `🔓 Вам надано доступ до бота. Можете почати користування.`, getMainKeyboard(targetId));
 });
 
 // 🚫 Відкликання доступу
 bot.onText(/\/unverify (\d+)/, (msg, match) => {
-  if (msg.chat.id !== adminChatId) return;
   const targetId = parseInt(match[1], 10);
-  const isAdmin = chatId === adminChatId;
-   const user = users[chatId]; 
+  if (msg.chat.id !== adminChatId) return;
+
   verifiedUsers.delete(targetId);
   bot.sendMessage(adminChatId, `🚫 Користувач ${targetId} більше не має доступу.`);
   bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
@@ -638,23 +629,20 @@ bot.onText(/\/unverify (\d+)/, (msg, match) => {
 // 📊 Статистика
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
-   const user = users[chatId]; 
   const text = msg.text;
-  const isAdmin = chatId === adminChatId;
-
-  if (!isAdmin) return;
+  if (chatId !== adminChatId) return;
 
   if (text === '📋 Переглянути всі замовлення') {
     let report = '📋 Усі замовлення:\n\n';
     let found = false;
 
     for (const uid in users) {
-      const user = users[uid];
-      if (!user.orders || user.orders.length === 0) continue;
+      const u = users[uid];
+      if (!u.orders || u.orders.length === 0) continue;
 
       found = true;
-      report += `👤 @${user.username} (${user.name})\n`;
-      user.orders.forEach((order, i) => {
+      report += `👤 @${u.username} (${u.name})\n`;
+      u.orders.forEach((order, i) => {
         report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.address}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
       });
     }
@@ -679,8 +667,8 @@ bot.on('message', (msg) => {
     let totalQuantity = 0;
 
     for (const uid in users) {
-      const user = users[uid];
-      user.orders.forEach(order => {
+      const u = users[uid];
+      u.orders.forEach(order => {
         totalOrders++;
         const qty = parseInt(order.quantity);
         if (!isNaN(qty)) totalQuantity += qty;
