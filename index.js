@@ -1,7 +1,7 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const { getUsersFromSheet, isVerified } = require('./googleSheets');
+const { getUsersFromSheet, isVerified: isVerifiedFromSheet} = require('./googleSheets');
 
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
