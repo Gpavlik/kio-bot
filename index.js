@@ -407,15 +407,18 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
 
     axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateStatus',
-      timestamp: lastOrder.timestamp,
-      chatId: chatId,
+      timestamp: order.timestamp,
+      chatId: targetId,
       status: 'скасовано'
     }).then(() => {
       console.log('✅ Статус оновлено в таблиці');
+        order.status = 'скасовано';
+      bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
       bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
+      bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     }).catch((err) => {
       console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.sendMessage(adminChatId, `⚠️ Не вдалося оновити статус: ${err.message}`);
+      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
     });
     return;
   }
@@ -630,9 +633,14 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
     }).then(() => {
       console.log('✅ Статус "прийнято" оновлено в таблиці');
       order.status = 'прийнято';
+      bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+      bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
+      bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
     }).catch((err) => {
       console.error('❌ Помилка оновлення статусу:', err.message);
+      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
     });
+    return;
   }
 
   bot.sendMessage(targetId, `🚚 Ваше замовлення вже в дорозі! Дякуємо за довіру ❤️`);
