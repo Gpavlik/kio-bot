@@ -171,6 +171,12 @@ bot.on('message', async (msg) => {
     return;
   }
 });
+
+// 📦 Обробка замовлення
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  const user = users[chatId];
   const order = activeOrders[chatId];
   if (order) {
     if (!order.quantity) {
@@ -374,7 +380,7 @@ bot.on('message', async (msg) => {
   if (text === '📞 Зв’язатися з оператором') {
     bot.sendContact(chatId, '+380932168041', 'Оператор');
     return;
-  }
+  }});
 bot.on('callback_query', (query) => {
   const data = query.data;
   const adminId = query.message.chat.id;
