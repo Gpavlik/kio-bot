@@ -422,6 +422,24 @@ bot.on('callback_query', (query) => {
 
     order.status = 'прийнято';
     bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+    axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+          action: 'add',
+          timestamp: order.timestamp,
+          chatId: chatId,
+          name: users[chatId].name,
+          username: users[chatId].username,
+          quantity: order.quantity,
+          city: order.city,
+          address: order.address,
+          np: order.np,
+          phone: order.phone,
+          status: order.status
+        }).then(() => {
+          console.log(`✅ Замовлення записано для ${order.address}`);
+        }).catch((err) => {
+          console.error(`❌ Помилка запису замовлення: ${err.message}`);
+          bot.sendMessage(adminChatId, `⚠️ Не вдалося записати замовлення від @${users[chatId].username}: ${err.message}`);
+        });
     bot.sendMessage(adminChatId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
     bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
     return;
@@ -436,11 +454,17 @@ bot.on('callback_query', (query) => {
       bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
       return;
     }
-
+ axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+      action: 'updateStatus',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      status: 'скасовано'
+    }).then(() => {
     order.status = 'скасовано';
     bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
     bot.sendMessage(adminChatId, `❌ Замовлення від @${user.username} було скасовано.`);
     bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
+    });
     return;
   }
 
