@@ -8,6 +8,19 @@ const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const bot = new TelegramBot(token, { polling: true });
 
+const { getUsersFromSheet } = require('./googleSheets');
+
+bot.onText(/\/debug/, async (msg) => {
+  const chatId = msg.chat.id;
+  try {
+    const users = await getUsersFromSheet();
+    console.log('Users from sheet:', users);
+    bot.sendMessage(chatId, `✅ Отримано ${users.length - 1} користувачів з таблиці.`);
+  } catch (error) {
+    console.error('Помилка при читанні таблиці:', error);
+    bot.sendMessage(chatId, `⚠️ Не вдалося прочитати таблицю. Перевір доступ або формат.`);
+  }
+});
 
 
 // Обробка /start
