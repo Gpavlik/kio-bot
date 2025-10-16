@@ -3,9 +3,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
 const token = process.env.BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
-const user = users[chatId]; 
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
+
 const users = {
   [adminChatId]: {
     name: 'Адміністратор',
@@ -14,6 +13,8 @@ const users = {
     verificationRequested: false
   }
 };
+
+const bot = new TelegramBot(token, { polling: true });
 
 const verifiedUsers = new Set([adminChatId]);
 const verificationRequests = {};
