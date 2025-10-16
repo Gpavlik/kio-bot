@@ -178,6 +178,8 @@ bot.on('message', async (msg) => {
   const text = msg.text;
   const user = users[chatId];
   const order = activeOrders[chatId];
+  const isAdmin = chatId === adminChatId;
+
   if (order) {
     if (!order.quantity) {
       if (!/^\d+$/.test(text)) {
