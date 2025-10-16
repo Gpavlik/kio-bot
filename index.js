@@ -21,7 +21,11 @@ bot.onText(/\/debug/, async (msg) => {
     bot.sendMessage(chatId, `⚠️ Не вдалося прочитати таблицю. Перевір доступ або формат.`);
   }
 });
-
+verificationRequests[chatId] = {
+  step: 1,
+  createdAt: Date.now(),
+  username: msg.from.username || 'невідомо'
+};
 
 // Обробка /start
 bot.onText(/\/start/, async (msg) => {
