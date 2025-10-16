@@ -173,7 +173,7 @@ bot.on('message', async (msg) => {
 });
 
 // 📦 Обробка замовлення
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const user = users[chatId];
@@ -268,6 +268,39 @@ bot.on('message', (msg) => {
       return;
     }
   }
+
+  // 📦 Введення ТТН
+if (isAdmin && pendingTTN[chatId]) {
+  const { targetId, timestamp } = pendingTTN[chatId];
+  const user = users[targetId];
+  const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
+
+  if (!order) {
+    bot.sendMessage(chatId, `❌ Замовлення не знайдено для ТТН.`);
+    delete pendingTTN[chatId];
+    return;
+  }
+
+  order.ttn = text;
+
+  try {
+    await axios.post('https://script.google.com/macros/s/AKfycbwOYG4ZyY4e5UB9AV8Jb6jWRAHWHVQWvym2tnXo3JPraY3LbRm3X9ubwpbaPlnJxkdG/exec', {
+      action: 'updateTTN',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      ttn: text
+    });
+
+    bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
+    bot.sendMessage(chatId, `✅ ТТН записано.`);
+  } catch (err) {
+    console.error('❌ Помилка запису ТТН:', err.message);
+    bot.sendMessage(chatId, `⚠️ Не вдалося записати ТТН: ${err.message}`);
+  }
+
+  delete pendingTTN[chatId];
+  return;
+}
 
   // ℹ️ Інформація
   if (text === 'ℹ️ Інформація') {
