@@ -5,6 +5,22 @@ const axios = require('axios');
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const bot = new TelegramBot(token, { polling: true });
+const { isVerified } = require('./googleSheets');
+
+bot.onText(/\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+  const { first_name, username } = msg.from;
+
+  const verified = await isVerified(chatId);
+
+  if (!verified) {
+    bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
+    verificationRequests[chatId] = { step: 1, createdAt: Date.now(), username: username || 'невідомо' };
+    return;
+  }
+
+  bot.sendMessage(chatId, `Вітаємо, ${first_name || 'користувачу'}! Я бот для замовлення продукту Kiomedine. Щоб почати, оберіть опцію з клавіатури нижче:`, getMainKeyboard(chatId));
+});
 
 // 👥 Користувачі
 const users = {
