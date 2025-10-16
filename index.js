@@ -225,7 +225,7 @@ bot.on('message', (msg) => {
 
       bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
-      axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+      axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
         action: 'add',
         timestamp: order.timestamp,
         chatId: chatId,
@@ -361,7 +361,7 @@ bot.on('message', (msg) => {
     lastOrder.status = 'скасовано';
     bot.sendMessage(chatId, `❌ Останнє замовлення позначено як скасоване.`);
 
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateStatus',
       timestamp: lastOrder.timestamp,
       chatId: chatId,
@@ -404,7 +404,7 @@ bot.on('message', (msg) => {
     bot.sendMessage(targetId, `📦 Ваше замовлення відправлено!\nНомер ТТН: ${text}`);
     bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
 
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -436,7 +436,7 @@ bot.on('callback_query', (query) => {
     users[targetId].verificationRequested = false;
     users[targetId].justVerified = true;
 
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'addUser',
       timestamp: Date.now(),
       chatId: targetId,
@@ -470,7 +470,7 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -497,7 +497,7 @@ bot.on('callback_query', (query) => {
       return;
     }
 
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -578,7 +578,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   }
 
   if (order.status !== 'прийнято') {
-    axios.post('https://script.google.com/macros/s/AKfycbzPr6BOEEd7125kVOOYFkTWw8qg3zoDKla50LSxEszMVvpMM60sVFaQn6k6VdH8Gec0/exec', {
+    axios.post('https://script.google.com/macros/s/AKfycbwkrfLvG2rOzbu2CJNBGk20_wWoBE7ZEc_1qDIdXZbaqzyqoAAHmtvpDCadEUNtyU1h/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
