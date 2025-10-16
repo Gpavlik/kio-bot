@@ -85,17 +85,41 @@ bot.onText(/\/start/, async (msg) => {
 });
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const text = msg.text?.trim();
   const user = getUser(chatId);
   const isUserVerified = isVerified(chatId);
-  const text = msg.text;
-  const isAdmin = chatId === adminChatId;
- 
-if (!isUserVerified) {
-  bot.sendMessage(chatId, `🔒 Ви ще не верифіковані. Натисніть /start або зверніться до оператора.`);
-  return;
-}
 
-  if (!text) return;
+  // ✅ Дозволити /start навіть не верифікованим
+  if (text === '/start') {
+    if (isUserVerified) {
+      bot.sendMessage(chatId, `👋 Ви вже верифіковані.`, getMainKeyboard(chatId));
+    } else {
+      verificationRequests[chatId] = {
+        name: msg.from.first_name,
+        username: msg.from.username
+      };
+      bot.sendMessage(adminChatId, `📥 Запит на верифікацію від @${msg.from.username} (${chatId})`, {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '✅ Надати доступ', callback_data: `verify_${chatId}` }
+          ]]
+        }
+      });
+      bot.sendMessage(chatId, `⏳ Очікуйте підтвердження від адміністратора.`);
+    }
+    return;
+  }
+
+  // 🔒 Блокувати все інше, якщо не верифікований
+  if (!isUserVerified) {
+    bot.sendMessage(chatId, `🔒 Ви ще не верифіковані. Натисніть /start або зверніться до оператора.`);
+    return;
+  }
+
+  // ✅ Верифікований користувач — обробляємо далі
+  bot.sendMessage(chatId, `👋 Вітаю, ${user.name}!`, getMainKeyboard(chatId));
+
+
 
   // 🔐 Верифікація
   if (!verifiedUsers.has(chatId) && !isAdmin) {
