@@ -1,0 +1,14 @@
+{
+  "123456789": {
+    "name": "Павло",
+    "username": "pavlo_dev",
+    "verified": true,
+    "orders": []
+  },
+  "987654321": {
+    "name": "Ольга",
+    "username": "olga_bot",
+    "verified": false,
+    "orders": []
+  }
+}

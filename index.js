@@ -6,17 +6,18 @@ const { getUsersFromSheet, isVerified } = require('./googleSheets');
 const token = process.env.BOT_TOKEN;
 const adminChatId = Number(process.env.ADMIN_CHAT_ID);
 const bot = new TelegramBot(token, { polling: true });
+// 🧠 Менеджер користувачів
+const {
+  loadUsers,
+  updateUser,
+  isVerified,
+  getUser,
+  users,
+  verifiedUsers
+} = require('./userManager');
 
+loadUsers(); // ⏱️ Зчитати користувачів при запуску
 const verificationRequests = {};
-const users = {
-  [adminChatId]: {
-    name: 'Адміністратор',
-    username: 'admin',
-    orders: [],
-    verificationRequested: false
-  }
-};
-const verifiedUsers = new Set([adminChatId]);
 const activeOrders = {};
 const pendingMessages = [];
 const pendingTTN = {};
@@ -84,9 +85,15 @@ bot.onText(/\/start/, async (msg) => {
 });
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const user = getUser(chatId);
+  const isUserVerified = isVerified(chatId);
   const text = msg.text;
   const isAdmin = chatId === adminChatId;
-  const user = users[chatId];
+ 
+if (!isUserVerified) {
+  bot.sendMessage(chatId, `🔒 Ви ще не верифіковані. Натисніть /start або зверніться до оператора.`);
+  return;
+}
 
   if (!text) return;
 
@@ -312,6 +319,7 @@ if (isAdmin && pendingTTN[chatId]) {
           ['🛠 Дія', '📦 Склад'],
           ['⚙️ Ефект', '⚠️ Увага'],
           ['💡 Клінічні випадки'],
+          ['$ Ціна'],
           ['📝 Застосування', '🔙 Назад']
         ],
         resize_keyboard: true
@@ -392,6 +400,11 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
 • Пацієнтам слід рекомендувати уникати надмірних фізичних навантажень на суглоб протягом перших 48 годин після ін'єкції.`);
     return;
   }
+// $ Ціна
+  if (text === '$ Ціна') {
+    bot.sendMessage(chatId, `Ціна за 1 упаковку (3 ml) KioMedinevsOne становить 8500 грн.`);
+    return;
+  }
 
   // 💡 Клінічні випадки
   if (text === '💡 Клінічні випадки') {
@@ -466,29 +479,26 @@ bot.on('callback_query', async (query) => {
 
   // 🔐 Верифікація
   if (data.startsWith('verify_')) {
-    const targetId = parseInt(data.split('_')[1], 10);
-    const request = verificationRequests[targetId];
+  const targetId = parseInt(data.split('_')[1], 10);
+  const request = verificationRequests[targetId];
 
-    verifiedUsers.add(targetId);
-    users[targetId] = users[targetId] || {
-      name: request?.name || 'Невідомо',
-      username: request?.username || 'невідомо',
-      orders: [],
-      verificationRequested: false
-    };
-    users[targetId].justVerified = true;
+  updateUser(targetId, {
+    name: request?.name || 'Невідомо',
+    username: request?.username || 'невідомо',
+    verified: true,
+    orders: []
+  });
 
-    bot.sendMessage(targetId, `🔓 Вам надано доступ до бота.`, getMainKeyboard(targetId));
-    bot.sendMessage(adminChatId, `✅ Доступ надано користувачу @${users[targetId].username} (${targetId})`);
-    bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
-    delete verificationRequests[targetId];
-    return;
-  }
-
+  bot.sendMessage(targetId, `🔓 Вам надано доступ до бота.`, getMainKeyboard(targetId));
+  bot.sendMessage(adminChatId, `✅ Доступ надано користувачу @${request?.username} (${targetId})`);
+  bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
+  delete verificationRequests[targetId];
+  return;
+}
   // ✅ Прийняти замовлення
   if (data.startsWith('accept_')) {
     const [_, targetId, timestamp] = data.split('_');
-    const user = users[targetId];
+    const user = getUser(targetId);
     const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
     if (!order || order.status === 'скасовано') {
       bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення не знайдено або скасовано.' });
