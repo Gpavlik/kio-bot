@@ -755,7 +755,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
 });
 let broadcastPayload = { text: null, photoPath: null };
 
-bot.onText(/\/broadcast/, (msg) => {
+bot.onText(/\/!broadcast/, (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
   adminChatIds.forEach(id => {
@@ -819,7 +819,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  if (!broadcastPayload.text && text && !text.startsWith('/')) {
+  if (!broadcastPayload.text && text && !text.startsWith('/!')) {
     broadcastPayload.text = text;
     bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
     return;
