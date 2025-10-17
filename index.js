@@ -152,7 +152,7 @@ bot.on('message', async (msg) => {
         request.step = 6;
         bot.sendMessage(chatId, `⏳ Дані надіслані оператору. Очікуйте підтвердження.`);
 
-        adminChatIds.forEach(id => {
+        adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
           bot.sendMessage(id, `🔐 Запит на верифікацію:\n👤 ${request.name}\n📞 ${request.phone}\n🏙️ ${request.town}\n🏢 ${request.workplace}\n👤 Співробітник: ${request.verifierName}\n🆔 chatId: ${chatId}`, {
             reply_markup: {
               inline_keyboard: [[{ text: '✅ Надати доступ', callback_data: `verify_${chatId}` }]]
@@ -173,7 +173,7 @@ bot.on('message', async (msg) => {
     pendingMessages.push({ chatId, username: user?.username || 'невідомо', text });
     delete activeOrders[chatId];
     bot.sendMessage(chatId, `✅ Ваше запитання надіслано оператору.`);
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => {  if (!id || isNaN(id)) return;
       bot.sendMessage(id, `❓ Запитання від @${user?.username || 'невідомо'}:\n${text}`, {
         reply_markup: {
           inline_keyboard: [[{ text: '✍️ Відповісти', callback_data: `reply_${chatId}` }]]
@@ -285,7 +285,7 @@ bot.on('message', async (msg) => {
         });
       });
 
-      adminChatIds.forEach(id => {
+      adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
         bot.sendMessage(id, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
           reply_markup: {
             inline_keyboard: [
@@ -520,7 +520,7 @@ bot.on('callback_query', async (query) => {
     });
 
     bot.sendMessage(targetId, `🔓 Вам надано доступ до бота.`, getMainKeyboard(targetId));
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
       bot.sendMessage(id, `✅ Доступ надано користувачу @${request?.username} (${targetId})`);
     });
     bot.answerCallbackQuery(query.id, { text: 'Доступ надано ✅' });
@@ -564,7 +564,7 @@ bot.on('callback_query', async (query) => {
       });
 
       bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-      adminChatIds.forEach(id => {
+      adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
         bot.sendMessage(id, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
       });
       bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
@@ -595,7 +595,7 @@ bot.on('callback_query', async (query) => {
       });
 
       bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      adminChatIds.forEach(id => {
+      adminChatIds.forEach(id => {    if (!id || isNaN(id)) return;
         bot.sendMessage(id, `❌ Замовлення від @${user.username} було скасовано.`);
       });
       bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
@@ -656,7 +656,7 @@ bot.onText(/\/verify (\d+)/, (msg, match) => {
   };
   users[targetId].justVerified = true;
 
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `✅ Користувач ${targetId} верифікований.`);
   });
   bot.sendMessage(targetId, `🔓 Вам надано доступ до бота. Можете почати користування.`, getMainKeyboard(targetId));
@@ -667,7 +667,7 @@ bot.onText(/\/unverify (\d+)/, (msg, match) => {
   const targetId = parseInt(match[1], 10);
 
   verifiedUsers.delete(targetId);
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `🚫 Користувач ${targetId} більше не має доступу.`);
   });
   bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
@@ -679,7 +679,7 @@ bot.onText(/\/reply (\d+) (.+)/, (msg, match) => {
   const replyText = match[2];
 
   bot.sendMessage(targetId, `📩 Повідомлення від оператора:\n${replyText}`);
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `✅ Відповідь надіслано.`);
   });
 });
@@ -690,7 +690,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   const user = getUser(targetId);
 
   if (!user || !user.orders || user.orders.length === 0) {
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
       bot.sendMessage(id, `⛔️ Замовлення не знайдено.`);
     });
     return;
@@ -699,7 +699,7 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   const order = user.orders[user.orders.length - 1];
 
   if (order.status === 'скасовано') {
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => {  if (!id || isNaN(id)) return;
       bot.sendMessage(id, `⛔️ Це замовлення вже скасовано.`);
     });
     return;
@@ -708,14 +708,14 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   if (order.status !== 'прийнято') {
     order.status = 'прийнято';
     bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => {  if (!id || isNaN(id)) return;
       bot.sendMessage(id, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
     });
     return;
   }
 
   bot.sendMessage(targetId, `🚚 Ваше замовлення вже в дорозі! Дякуємо за довіру ❤️`);
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `✅ Доставку підтверджено.`);
   });
 });
@@ -813,7 +813,7 @@ bot.on('message', async (msg) => {
 bot.onText(/\/broadcast/, (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
   });
 
@@ -825,7 +825,7 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   const { text, photoPath } = broadcastPayload;
   if (!text) {
-    adminChatIds.forEach(id => {
+    adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
       bot.sendMessage(id, `⚠️ Спочатку надішліть текст повідомлення.`);
     });
     return;
@@ -848,7 +848,7 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
     }
   }
 
-  adminChatIds.forEach(id => {
+  adminChatIds.forEach(id => { if (!id || isNaN(id)) return;
     bot.sendMessage(id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   });
 
