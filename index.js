@@ -742,6 +742,19 @@ if (text === '🔙 Назад до користувацького меню') {
   bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
   return;
 }
+if (text === '📜 Історія замовлень') {
+  if (!user?.orders?.length) {
+    bot.sendMessage(chatId, `📭 У Вас поки немає замовлень.`);
+    return;
+  }
+
+  const historyText = user.orders.map((order, i) => 
+    `#${i + 1}\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 ${order.phone}\n📌 Статус: ${order.status || 'очікує'}\n`
+  ).join('\n');
+
+  bot.sendMessage(chatId, `🕘 Історія Ваших замовлень:\n\n${historyText}`);
+  return;
+}
 
   // 🧼 Catch-all: якщо нічого не спрацювало
   if (text && !text.startsWith('/')) {
