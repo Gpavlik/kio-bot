@@ -278,6 +278,7 @@ bot.onText(/\/adminpanel/, (msg) => {
 bot.on('callback_query', async (query) => {
   const adminId = query.message.chat.id;
   const data = query.data;
+console.log('📥 Отримано callback_query:', query.data);
 
   if (!isAdmin(adminId)) {
     bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
