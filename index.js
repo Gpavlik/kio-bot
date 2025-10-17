@@ -631,12 +631,14 @@ bot.onText(/\/adminpanel/, (msg) => {
       keyboard: [
         ['📋 Переглянути всі замовлення'],
         ['📩 Відповісти користувачу', '🚚 Підтвердити доставку'],
-        ['📊 Статистика', '🔙 Назад до користувацького меню']
+        ['📊 Статистика', '📢 Зробити розсилку'],
+        ['🔙 Назад до користувацького меню']
       ],
       resize_keyboard: true
     }
   });
 });
+
 
 // ✅ Верифікація вручну
 bot.onText(/\/verify (\d+)/, (msg, match) => {
@@ -737,6 +739,13 @@ bot.on('message', (msg) => {
     return;
   }
 
+  if (chatId === adminChatId && text === '📢 Зробити розсилку') {
+  bot.sendMessage(chatId, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете — додайте фото. Коли все буде готово, надішліть /sendbroadcast`);
+  broadcastPayload = { text: null, photoPath: null };
+  return;
+}
+
+
   if (text === '📊 Статистика') {
     let totalOrders = 0;
     let totalUsers = Object.keys(users).length;
@@ -760,6 +769,75 @@ bot.on('message', (msg) => {
     bot.sendMessage(chatId, `🔄 Повертаємося до стандартного меню...`, getMainKeyboard(chatId));
     return;
   }
+});
+const fs = require('fs');
+
+// Зберігаємо тимчасове повідомлення для розсилки
+let broadcastPayload = {
+  text: null,
+  photoPath: null
+};
+
+// Команда для запуску розсилки
+bot.onText(/\/broadcast/, (msg) => {
+  if (msg.chat.id !== adminChatId) return;
+
+  bot.sendMessage(adminChatId, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
+  broadcastPayload = { text: null, photoPath: null };
+});
+
+// Отримуємо текст або фото
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  if (chatId !== adminChatId) return;
+
+  // Фото
+  if (msg.photo) {
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.photoPath = fileUrl;
+    bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+
+  // Текст
+  if (!broadcastPayload.text && msg.text && !msg.text.startsWith('/')) {
+    broadcastPayload.text = msg.text;
+    bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+});
+
+// Запуск розсилки
+bot.onText(/\/sendbroadcast/, async (msg) => {
+  if (msg.chat.id !== adminChatId) return;
+
+  const { text, photoPath } = broadcastPayload;
+  if (!text) {
+    bot.sendMessage(adminChatId, `⚠️ Спочатку надішліть текст повідомлення.`);
+    return;
+  }
+
+  let success = 0;
+  let failed = 0;
+
+  for (const id of verifiedUsers) {
+    try {
+      if (photoPath) {
+        await bot.sendPhoto(id, photoPath, { caption: text });
+      } else {
+        await bot.sendMessage(id, `📢 ${text}`);
+      }
+      success++;
+    } catch (err) {
+      console.error(`❌ Не вдалося надіслати ${id}:`, err.message);
+      failed++;
+    }
+  }
+
+  bot.sendMessage(adminChatId, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
+  broadcastPayload = { text: null, photoPath: null };
 });
 
 // 🧯 Polling error
