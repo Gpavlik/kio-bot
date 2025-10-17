@@ -295,7 +295,7 @@ bot.on('message', async (msg) => {
 
       // 📤 Надсилання в Google Таблицю
       try {
-        await axios.post(process.env.GOOGLE_SCRIPT_URL, {
+        await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
           action: 'add',
           timestamp: order.timestamp,
           chatId,
@@ -355,7 +355,7 @@ bot.on('message', async (msg) => {
     order.ttn = text;
 
     try {
-      await axios.post(process.env.GOOGLE_SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
         action: 'updateTTN',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -533,7 +533,7 @@ bot.on('callback_query', async (query) => {
     });
 
     try {
-      await axios.post(process.env.GOOGLE_SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
         action: 'add',
         chatId: targetId,
         name: request.name,
@@ -571,7 +571,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'прийнято';
 
     try {
-      await axios.post(process.env.GOOGLE_SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -605,7 +605,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'скасовано';
 
     try {
-      await axios.post(process.env.GOOGLE_SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
