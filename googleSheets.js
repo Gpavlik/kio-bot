@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 const { GoogleAuth } = require('google-auth-library');
 
-// Авторизація через змінну середовища Railway
+// Авторизація через Railway-змінну
 const auth = new GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
@@ -9,10 +9,10 @@ const auth = new GoogleAuth({
 
 const sheets = google.sheets({ version: 'v4', auth });
 
-// ID таблиці
+// 📄 ID таблиці
 const spreadsheetId = '1LHbfKAtkkbBk6noyZsad7_geQ-uWCWT2xtmKKKKK0Vo';
 
-// Читання всіх рядків з аркуша Users
+// 📥 Отримати всі рядки з аркуша Users
 async function getUsersFromSheet() {
   try {
     const res = await sheets.spreadsheets.values.get({
@@ -21,24 +21,18 @@ async function getUsersFromSheet() {
     });
     return res.data.values || [];
   } catch (error) {
-    console.error('❌ Помилка при читанні таблиці:', error);
+    console.error('❌ Помилка при читанні таблиці:', error.message);
     throw error;
   }
 }
 
-// Перевірка, чи chatId є в колонці D
+// ✅ Перевірити, чи chatId є в колонці D
 async function isVerified(chatId) {
   try {
     const rows = await getUsersFromSheet();
-    for (let i = 1; i < rows.length; i++) {
-      const storedChatId = Number(rows[i][3]); // колонка D
-      if (storedChatId === Number(chatId)) {
-        return true;
-      }
-    }
-    return false;
+    return rows.some((row, index) => index > 0 && Number(row[3]) === Number(chatId));
   } catch (error) {
-    console.error('❌ Помилка при перевірці доступу:', error);
+    console.error('❌ Помилка при перевірці доступу:', error.message);
     return false;
   }
 }
