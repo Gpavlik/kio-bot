@@ -5,6 +5,7 @@ const { getUsersFromSheet, isVerified: isVerifiedFromSheet } = require('./google
 
 const token = process.env.BOT_TOKEN;
 const ordersById = {}; // глобально
+const pendingMessage = {};
 
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
@@ -279,7 +280,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycbz6m9Wl0r8HSgeeL3SoJBL1fziglGQ5dWSPf43LDIdVJyTOMSVfyEMpVMbSSpandB0/exec', {
       action: 'getHistory',
       chatId
     });
@@ -306,27 +307,44 @@ bot.onText(/📊 Статистика/, async (msg) => {
   if (!isAdmin(chatId)) return;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
-      action: 'getStats'
+    const [orderRes, userRes] = await Promise.all([
+      axios.post(process.env.GOOGLE_SCRIPT_URL, { action: 'getStats' }),
+      axios.post(process.env.GOOGLE_SCRIPT_URL, { action: 'getUserOrderStats' })
+    ]);
+
+    const orders = orderRes.data;
+    const users = userRes.data;
+
+    const header = `📊 Статистика замовлень:\n` +
+      `🔢 Всього: ${orders.total}\n` +
+      `✅ Прийнято: ${orders.accepted}\n` +
+      `❌ Скасовано: ${orders.canceled}\n` +
+      `⏳ Очікує: ${orders.pending}\n\n` +
+      `👥 Статистика користувачів:\n` +
+      `🔢 Всього: ${users.totalUsers}\n` +
+      `📦 З замовленнями: ${users.withOrders}\n` +
+      `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
+      `📋 Користувачі:`; 
+
+    const buttons = users.users.map(u => [{
+      text: `${u.name} (${u.lastOrderDate || '—'})`,
+      callback_data: `msg_${u.chatId}`
+    }]);
+
+    bot.sendMessage(chatId, header, {
+      reply_markup: {
+        inline_keyboard: buttons
+      }
     });
-
-    const stats = res.data;
-
-    bot.sendMessage(chatId, `📊 Статистика замовлень:\n\n🔢 Всього: ${stats.total}\n✅ Прийнято: ${stats.accepted}\n❌ Скасовано: ${stats.canceled}\n⏳ Очікує: ${stats.pending}`);
   } catch (err) {
-    console.error('❌ Помилка отримання статистики:', err.message);
+    console.error('❌ Помилка статистики:', err.message);
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
   }
 });
 
 
 
-
-
-
-
-
-
+// Обробка callback_query
 bot.on('callback_query', async (query) => {
   const adminId = query.message.chat.id;
   const data = query.data;
@@ -336,7 +354,16 @@ console.log('📥 Отримано callback_query:', query.data);
     bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
     return;
   }
+  const chatId = query.message.chat.id;
+  
 
+  if (data.startsWith('msg_')) {
+    const targetId = data.split('_')[1];
+    pendingMessage[chatId] = targetId;
+    bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
   // ✍️ Відповісти користувачу
   if (data.startsWith('reply_')) {
     const targetId = parseInt(data.split('_')[1], 10);
@@ -365,7 +392,7 @@ console.log('📥 Отримано callback_query:', query.data);
   order.status = 'прийнято';
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbz6m9Wl0r8HSgeeL3SoJBL1fziglGQ5dWSPf43LDIdVJyTOMSVfyEMpVMbSSpandB0/exec', {
       action: 'updateStatus',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -396,7 +423,7 @@ console.log('📥 Отримано callback_query:', query.data);
     order.status = 'скасовано';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbz6m9Wl0r8HSgeeL3SoJBL1fziglGQ5dWSPf43LDIdVJyTOMSVfyEMpVMbSSpandB0/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -447,6 +474,15 @@ bot.on('message', async (msg) => {
       };
       bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
     }
+    return;
+  }
+
+// ✉️ Надсилання повідомлення користувачу
+  if (userIsAdmin && pendingMessage[chatId]) {
+    const targetId = pendingMessage[chatId];
+    bot.sendMessage(targetId, `📩 Повідомлення від адміністратора:\n\n${text}`);
+    bot.sendMessage(chatId, `✅ Повідомлення надіслано.`);
+    delete pendingMessage[chatId];
     return;
   }
 
@@ -590,7 +626,7 @@ bot.on('message', async (msg) => {
   order.ttn = text;
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbz6m9Wl0r8HSgeeL3SoJBL1fziglGQ5dWSPf43LDIdVJyTOMSVfyEMpVMbSSpandB0/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -679,7 +715,7 @@ console.log('✅ Збережено orderId:', orderId);
 
       // 📤 Надсилання в Google Таблицю
       try {
-        await axios.post('https://script.google.com/macros/s/AKfycbzS7PYgeAUfl5enRG7uCapIUBrVlBjZFNS8yK_UstJ_IWAD-YVFKxGbr-GBYwzs0Svh/exec', {
+        await axios.post('https://script.google.com/macros/s/AKfycbz6m9Wl0r8HSgeeL3SoJBL1fziglGQ5dWSPf43LDIdVJyTOMSVfyEMpVMbSSpandB0/exec', {
           action: 'add',
           timestamp: order.timestamp,
           chatId,
@@ -848,25 +884,6 @@ if (userIsAdmin && text === '📋 Переглянути всі замовлен
   return;
 }
 
-// 📊 Статистика
-if (userIsAdmin && text === '📊 Статистика') {
-  let totalOrders = 0;
-  let totalUsers = Object.keys(users).length;
-  let totalQuantity = 0;
-
-  for (const uid in users) {
-    const u = users[uid];
-    u.orders?.forEach(order => {
-      totalOrders++;
-      const qty = parseInt(order.quantity);
-      if (!isNaN(qty)) totalQuantity += qty;
-    });
-  }
-
-  const stats = `📊 Статистика:\n\n👥 Користувачів: ${totalUsers}\n📦 Замовлень: ${totalOrders}\n📈 Сумарна кількість товару: ${totalQuantity} шт`;
-  bot.sendMessage(chatId, stats);
-  return;
-}
 
 // 📢 Зробити розсилку
 if (userIsAdmin && text === '📢 Зробити розсилку') {
@@ -896,19 +913,6 @@ if (userIsAdmin && text === '🚚 Підтвердити доставку') {
 }
 if (text === '🔙 Назад до користувацького меню') {
   bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-  return;
-}
-if (text === '📜 Історія замовлень') {
-  if (!user?.orders?.length) {
-    bot.sendMessage(chatId, `📭 У Вас поки немає замовлень.`);
-    return;
-  }
-
-  const historyText = user.orders.map((order, i) => 
-    `#${i + 1}\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 ${order.phone}\n📌 Статус: ${order.status || 'очікує'}\n`
-  ).join('\n');
-
-  bot.sendMessage(chatId, `🕘 Історія Ваших замовлень:\n\n${historyText}`);
   return;
 }
 
