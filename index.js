@@ -361,6 +361,10 @@ console.log('📥 Отримано callback_query:', query.data);
     return;
   }
 
+console.log('🔍 Шукаємо orderId:', `${targetId}_${timestamp}`);
+console.log('📦 Знайдено:', ordersById[`${targetId}_${timestamp}`]);
+
+
   // 📦 Введення ТТН
   if (data.startsWith('ttn_')) {
     const [_, targetId, timestamp] = data.split('_');
@@ -599,21 +603,27 @@ bot.on('message', async (msg) => {
         return;
       }
 
-      order.phone = text;
-      order.timestamp = Date.now();
-      order.status = 'очікує';
+   order.phone = text;
+order.timestamp = Date.now();
+order.status = 'очікує';
 
-      if (!users[chatId]) {
-        users[chatId] = {
-          name: msg.from?.first_name || 'Невідомо',
-          username: msg.from?.username || 'невідомо',
-          orders: [],
-          verified: false
-        };
-      }
+if (!users[chatId]) {
+  users[chatId] = {
+    name: msg.from?.first_name || 'Невідомо',
+    username: msg.from?.username || 'невідомо',
+    orders: [],
+    verified: false
+  };
+}
 
-      users[chatId].orders = users[chatId].orders || [];
-      users[chatId].orders.push(order);
+users[chatId].orders = users[chatId].orders || [];
+users[chatId].orders.push(order);
+
+// 🆕 Зберігаємо в ordersById
+const orderId = `${chatId}_${order.timestamp}`;
+ordersById[orderId] = order;
+console.log('✅ Збережено orderId:', orderId);
+
 
       bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
