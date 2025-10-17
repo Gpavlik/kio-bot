@@ -254,6 +254,26 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   broadcastPayload = { text: null, photoPath: null };
   broadcastMode = false; // 🔚 Вихід з режиму
 });
+bot.onText(/\/adminpanel/, (msg) => {
+  const chatId = msg.chat.id;
+  if (!isAdmin(chatId)) {
+    bot.sendMessage(chatId, '⛔️ У вас немає доступу до панелі оператора.');
+    return;
+  }
+
+  bot.sendMessage(chatId, `👨‍💼 Панель оператора активна. Оберіть дію:`, {
+    reply_markup: {
+      keyboard: [
+        ['📋 Переглянути всі замовлення'],
+        ['📩 Відповісти користувачу', '🚚 Підтвердити доставку'],
+        ['📊 Статистика', '📢 Зробити розсилку'],
+        ['🔙 Назад до користувацького меню']
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    }
+  });
+});
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -652,28 +672,75 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
     bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
     return;
   }
+  // 📋 Переглянути всі замовлення
+if (userIsAdmin && text === '📋 Переглянути всі замовлення') {
+  let report = '📋 Усі замовлення:\n\n';
+  let found = false;
+
+  for (const uid in users) {
+    const u = users[uid];
+    if (!u.orders || u.orders.length === 0) continue;
+
+    found = true;
+    report += `👤 @${u.username} (${u.name})\n`;
+    u.orders.forEach((order, i) => {
+      report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.address}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
+    });
+  }
+
+  bot.sendMessage(chatId, found ? report : '📭 Немає замовлень.');
+  return;
+}
+
+// 📊 Статистика
+if (userIsAdmin && text === '📊 Статистика') {
+  let totalOrders = 0;
+  let totalUsers = Object.keys(users).length;
+  let totalQuantity = 0;
+
+  for (const uid in users) {
+    const u = users[uid];
+    u.orders?.forEach(order => {
+      totalOrders++;
+      const qty = parseInt(order.quantity);
+      if (!isNaN(qty)) totalQuantity += qty;
+    });
+  }
+
+  const stats = `📊 Статистика:\n\n👥 Користувачів: ${totalUsers}\n📦 Замовлень: ${totalOrders}\n📈 Сумарна кількість товару: ${totalQuantity} шт`;
+  bot.sendMessage(chatId, stats);
+  return;
+}
+
+// 📢 Зробити розсилку
+if (userIsAdmin && text === '📢 Зробити розсилку') {
+  broadcastMode = true;
+  broadcastPayload = {};
+  bot.sendMessage(chatId, `📢 Введіть текст повідомлення або надішліть фото. Коли будете готові — напишіть /sendbroadcast`);
+  return;
+}
+
+// 📩 Відповісти користувачу
+if (userIsAdmin && text === '📩 Відповісти користувачу') {
+  if (pendingMessages.length === 0) {
+    bot.sendMessage(chatId, `📭 Немає нових запитань від користувачів.`);
+    return;
+  }
+
+  const next = pendingMessages[0];
+  currentReplyTarget = next.chatId;
+  bot.sendMessage(chatId, `✍️ Відповідаєте користувачу @${next.username}:\n\n"${next.text}"`);
+  return;
+}
+
+// 🚚 Підтвердити доставку
+if (userIsAdmin && text === '🚚 Підтвердити доставку') {
+  bot.sendMessage(chatId, `📦 Натисніть кнопку "📦 Надіслати ТТН" під замовленням, щоб ввести номер.`);
+  return;
+}
+
   // 🧼 Catch-all: якщо нічого не спрацювало
   if (text && !text.startsWith('/')) {
     bot.sendMessage(chatId, `🤖 Не впізнаю команду. Оберіть опцію з меню нижче:`, getMainKeyboard(chatId));
   }
-});
-bot.onText(/\/adminpanel/, (msg) => {
-  const chatId = msg.chat.id;
-  if (!isAdmin(chatId)) {
-    bot.sendMessage(chatId, '⛔️ У вас немає доступу до панелі оператора.');
-    return;
-  }
-
-  bot.sendMessage(chatId, `👨‍💼 Панель оператора активна. Оберіть дію:`, {
-    reply_markup: {
-      keyboard: [
-        ['📋 Переглянути всі замовлення'],
-        ['📩 Відповісти користувачу', '🚚 Підтвердити доставку'],
-        ['📊 Статистика', '📢 Зробити розсилку'],
-        ['🔙 Назад до користувацького меню']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    }
-  });
 });
