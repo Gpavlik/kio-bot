@@ -754,18 +754,22 @@ bot.onText(/\/send (\d+)/, (msg, match) => {
   });
 });
 let broadcastPayload = { text: null, photoPath: null };
+let broadcastMode = false;
 
-bot.onText(/\/!broadcast/, (msg) => {
+// 🔘 Запуск режиму розсилки
+bot.onText(/\/broadcast/, (msg) => {
   if (!isAdmin(msg.chat.id)) return;
+
+  broadcastMode = true;
+  broadcastPayload = { text: null, photoPath: null };
 
   adminChatIds.forEach(id => {
     if (!id || isNaN(id)) return;
     bot.sendMessage(id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
   });
-
-  broadcastPayload = { text: null, photoPath: null };
 });
 
+// 🚀 Відправка розсилки
 bot.onText(/\/sendbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
@@ -801,30 +805,33 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   });
 
   broadcastPayload = { text: null, photoPath: null };
+  broadcastMode = false; // 🔚 Вихід з режиму
 });
 
+// 📥 Обробка повідомлень лише в режимі розсилки
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
   const userIsAdmin = isAdmin(chatId);
 
-  if (!userIsAdmin) return;
+  if (!userIsAdmin || !broadcastMode) return;
 
   if (msg.photo) {
     const fileId = msg.photo[msg.photo.length - 1].file_id;
     const file = await bot.getFile(fileId);
     const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
     broadcastPayload.photoPath = fileUrl;
-    bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або напишіть /sendbroadcast для запуску.`);
+    bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
     return;
   }
 
-  if (!broadcastPayload.text && text && !text.startsWith('/!')) {
+  if (!broadcastPayload.text && text && !text.startsWith('/')) {
     broadcastPayload.text = text;
     bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
     return;
   }
 });
+
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
