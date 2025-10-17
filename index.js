@@ -325,11 +325,16 @@ bot.onText(/📊 Статистика/, async (msg) => {
       `📦 З замовленнями: ${users.withOrders}\n` +
       `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
       `📋 Користувачі:`; 
+console.log('📦 Відповідь getUserOrderStats:', users);
 
     const buttons = users.users.map(u => [{
       text: `${u.name} (${u.town}) — ${u.lastOrderDate}`,
       callback_data: `msg_${u.chatId}`
     }]);
+    
+if (!users || !Array.isArray(users.users)) {
+  return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
+}
 
     bot.sendMessage(chatId, header, {
       reply_markup: {
