@@ -274,6 +274,100 @@ bot.onText(/\/adminpanel/, (msg) => {
     }
   });
 });
+bot.on('callback_query', async (query) => {
+  const adminId = query.message.chat.id;
+  const data = query.data;
+
+  if (!isAdmin(adminId)) {
+    bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
+    return;
+  }
+
+  // ✍️ Відповісти користувачу
+  if (data.startsWith('reply_')) {
+    const targetId = parseInt(data.split('_')[1], 10);
+    currentReplyTarget = targetId;
+    bot.sendMessage(adminId, `✍️ Напишіть відповідь для користувача ${targetId}`);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // ✅ Прийняти замовлення
+  if (data.startsWith('accept_')) {
+    const [_, targetId, timestamp] = data.split('_');
+    const user = getUser(targetId);
+    const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
+
+    if (!order || order.status === 'скасовано') {
+      bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення не знайдено або скасовано.' });
+      return;
+    }
+
+    if (order.status === 'прийнято') {
+      bot.answerCallbackQuery(query.id, { text: 'ℹ️ Замовлення вже прийнято.' });
+      return;
+    }
+
+    order.status = 'прийнято';
+
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
+        action: 'updateStatus',
+        timestamp: order.timestamp,
+        chatId: targetId,
+        status: 'прийнято'
+      });
+
+      bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+      bot.sendMessage(adminId, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
+      bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
+    } catch (err) {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+    }
+    return;
+  }
+
+  // ❌ Скасувати замовлення
+  if (data.startsWith('cancel_')) {
+    const [_, targetId, timestamp] = data.split('_');
+    const user = getUser(targetId);
+    const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
+
+    if (!order || order.status === 'прийнято') {
+      bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
+      return;
+    }
+
+    order.status = 'скасовано';
+
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
+        action: 'updateStatus',
+        timestamp: order.timestamp,
+        chatId: targetId,
+        status: 'скасовано'
+      });
+
+      bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
+      bot.sendMessage(adminId, `❌ Замовлення від @${user.username} було скасовано.`);
+      bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
+    } catch (err) {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+    }
+    return;
+  }
+
+  // 📦 Введення ТТН
+  if (data.startsWith('ttn_')) {
+    const [_, targetId, timestamp] = data.split('_');
+    pendingTTN[adminId] = { targetId, timestamp };
+    bot.sendMessage(adminId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+});
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
