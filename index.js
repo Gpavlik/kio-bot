@@ -527,36 +527,38 @@ bot.on('message', async (msg) => {
 
   // 📦 Введення ТТН
   if (userIsAdmin && pendingTTN[chatId]) {
-    const { targetId, timestamp } = pendingTTN[chatId];
-    const targetUser = users[targetId];
-    const order = targetUser?.orders?.find(o => o.timestamp == Number(timestamp));
+  const { targetId, timestamp } = pendingTTN[chatId]; // 🔧 Ось тут ми їх отримуємо
 
-    if (!order) {
-      bot.sendMessage(chatId, `❌ Замовлення не знайдено для ТТН.`);
-      delete pendingTTN[chatId];
-      return;
-    }
+  const orderId = `${targetId}_${timestamp}`;
+  console.log('🔍 Шукаємо orderId:', orderId);
 
-    order.ttn = text;
-
-    try {
-      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
-        action: 'updateTTN',
-        timestamp: order.timestamp,
-        chatId: targetId,
-        ttn: text
-      });
-
-      bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
-      bot.sendMessage(chatId, `✅ ТТН записано.`);
-    } catch (err) {
-      console.error('❌ Помилка запису ТТН:', err.message);
-      bot.sendMessage(chatId, `⚠️ Не вдалося записати ТТН: ${err.message}`);
-    }
-
+  const order = ordersById[orderId];
+  if (!order) {
+    bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
     delete pendingTTN[chatId];
     return;
   }
+
+  order.ttn = text;
+
+  try {
+      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
+        action: 'updateTTN',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      ttn: text
+    });
+
+    bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
+    bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
+  } catch (err) {
+    console.error('❌ Помилка надсилання ТТН:', err.message);
+    bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
+  }
+
+  delete pendingTTN[chatId];
+  return;
+}
 
   // 🛒 Початок замовлення
   if (text === '🛒 Зробити замовлення') {
