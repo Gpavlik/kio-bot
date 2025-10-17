@@ -1,13 +1,20 @@
 require('dotenv').config();
+
+const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
+  .split(',')
+  .map(id => Number(id.trim()))
+  .filter(id => !isNaN(id));
+
+function isAdmin(chatId) {
+  return adminChatIds.includes(Number(chatId));
+}
+
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { getUsersFromSheet, isVerified: isVerifiedFromSheet} = require('./googleSheets');
 
 const token = process.env.BOT_TOKEN;
-const adminChatIds = process.env.ADMIN_CHAT_IDS
-  .split(',')
-  .map(id => Number(id.trim()))
-  .filter(id => !isNaN(id));
+
 
 const bot = new TelegramBot(token, { polling: true });
 // 🧠 Менеджер користувачів
