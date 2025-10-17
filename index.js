@@ -226,8 +226,7 @@ bot.on('message', async (msg) => {
   }
 
   const keyboard = getMainKeyboard(chatId);
-  bot.sendMessage(chatId, `👋 Вітаю, ${user.name || 'користувачу'}! Оберіть опцію з меню нижче:`, keyboard || {});
-});
+  });
 
 
 bot.on('message', async (msg) => {
