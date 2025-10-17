@@ -361,10 +361,6 @@ console.log('📥 Отримано callback_query:', query.data);
     return;
   }
 
-console.log('🔍 Шукаємо orderId:', `${targetId}_${timestamp}`);
-console.log('📦 Знайдено:', ordersById[`${targetId}_${timestamp}`]);
-
-
   // 📦 Введення ТТН
   if (data.startsWith('ttn_')) {
     const [_, targetId, timestamp] = data.split('_');
@@ -526,8 +522,8 @@ bot.on('message', async (msg) => {
   }
 
   // 📦 Введення ТТН
-  if (userIsAdmin && pendingTTN[chatId]) {
-  const { targetId, timestamp } = pendingTTN[chatId]; // 🔧 Ось тут ми їх отримуємо
+ if (userIsAdmin && pendingTTN[chatId]) {
+  const { targetId, timestamp } = pendingTTN[chatId]; // 🔧 Ось тут ми отримуємо змінні
 
   const orderId = `${targetId}_${timestamp}`;
   console.log('🔍 Шукаємо orderId:', orderId);
@@ -542,8 +538,8 @@ bot.on('message', async (msg) => {
   order.ttn = text;
 
   try {
-      await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
-        action: 'updateTTN',
+    await axios.post('https://script.google.com/macros/s/AKfycbxPotyVDDFaKvMNmjTZEnTqPqX0ijbkZKWD_rxcNCu5rU4nELrm5Aska7TOrSALrvfI/exec', {
+      action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
       ttn: text
