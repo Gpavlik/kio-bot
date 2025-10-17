@@ -733,6 +733,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
   const userIsAdmin = isAdmin(chatId);
+console.log('chatId:', chatId, 'isAdmin:', isAdmin(chatId));
 
   if (!userIsAdmin) return;
 
