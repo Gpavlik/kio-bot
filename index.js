@@ -394,36 +394,14 @@ bot.on('callback_query', async (query) => {
         verifierName: request.verifierName
       });
 
-      // 📝 Оновлення users.json
-      const usersPath = path.join(__dirname, 'users.json');
-      let currentUsers = [];
-
-      try {
-        currentUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
-      } catch (err) {
-        console.warn('⚠️ Не вдалося прочитати users.json, створюємо новий');
-      }
-
-      currentUsers.push({
-        name: request.name,
-        username: request.username || '',
-        chatId: targetChatId,
-        phone: request.phone,
-        town: request.town,
-        workplace: request.workplace,
-        verifierName: request.verifierName,
-        verifiedAt: new Date().toISOString()
-      });
-
-      fs.writeFileSync(usersPath, JSON.stringify(currentUsers, null, 2), 'utf8');
-      console.log(`✅ users.json оновлено: додано ${request.name}`);
-
       await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
       await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
 
       delete verificationRequests[targetChatId];
     } catch (err) {
       console.error('❌ Помилка при додаванні користувача:', err.message);
+      console.log(`✅ Верифіковано: ${request.name} (${targetChatId})`);
+
       await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
     }
     return;
