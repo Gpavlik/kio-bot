@@ -350,17 +350,22 @@ if (!users || !Array.isArray(users.users)) {
 
 
 
-// Обробка callback_query
+const fs = require('fs');
+const path = require('path');
+
 bot.on('callback_query', async (query) => {
   const adminId = query.message.chat.id;
   const data = query.data;
-console.log('📥 Отримано callback_query:', query.data);
+  console.log('📥 Отримано callback_query:', data);
 
   if (!isAdmin(adminId)) {
-    bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
+    await bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
     return;
   }
+
   const chatId = query.message.chat.id;
+
+  // ✅ Верифікація користувача
   if (data.startsWith('verify_')) {
     const targetChatId = data.split('_')[1];
     const request = verificationRequests[targetChatId];
@@ -370,19 +375,48 @@ console.log('📥 Отримано callback_query:', query.data);
       return;
     }
 
+    if (request.verified) {
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
+      return;
+    }
+
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...', show_alert: false });
 
     try {
       await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
         action: 'addUser',
         name: request.name,
-        username: request.username || '', // якщо є
+        username: request.username || '',
         chatId: targetChatId,
         phone: request.phone,
         town: request.town,
         workplace: request.workplace,
         verifierName: request.verifierName
       });
+
+      // 📝 Оновлення users.json
+      const usersPath = path.join(__dirname, 'users.json');
+      let currentUsers = [];
+
+      try {
+        currentUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+      } catch (err) {
+        console.warn('⚠️ Не вдалося прочитати users.json, створюємо новий');
+      }
+
+      currentUsers.push({
+        name: request.name,
+        username: request.username || '',
+        chatId: targetChatId,
+        phone: request.phone,
+        town: request.town,
+        workplace: request.workplace,
+        verifierName: request.verifierName,
+        verifiedAt: new Date().toISOString()
+      });
+
+      fs.writeFileSync(usersPath, JSON.stringify(currentUsers, null, 2), 'utf8');
+      console.log(`✅ users.json оновлено: додано ${request.name}`);
 
       await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
       await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
@@ -392,62 +426,62 @@ console.log('📥 Отримано callback_query:', query.data);
       console.error('❌ Помилка при додаванні користувача:', err.message);
       await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
     }
+    return;
   }
-if (request.verified) {
-  return bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
-}
 
+  // ✉️ Надіслати повідомлення користувачу
   if (data.startsWith('msg_')) {
     const targetId = data.split('_')[1];
     pendingMessage[chatId] = targetId;
-    bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
-    bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
+    await bot.answerCallbackQuery(query.id);
     return;
   }
+
   // ✍️ Відповісти користувачу
   if (data.startsWith('reply_')) {
     const targetId = parseInt(data.split('_')[1], 10);
     currentReplyTarget = targetId;
-    bot.sendMessage(adminId, `✍️ Напишіть відповідь для користувача ${targetId}`);
-    bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(adminId, `✍️ Напишіть відповідь для користувача ${targetId}`);
+    await bot.answerCallbackQuery(query.id);
     return;
   }
 
-// ✅ Прийняти замовлення
- if (data.startsWith('accept_')) {
-  const [_, targetId, timestamp] = data.split('_');
-  const orderId = `${targetId}_${timestamp}`;
-  const order = ordersById[orderId];
+  // ✅ Прийняти замовлення
+  if (data.startsWith('accept_')) {
+    const [_, targetId, timestamp] = data.split('_');
+    const orderId = `${targetId}_${timestamp}`;
+    const order = ordersById[orderId];
 
-  if (!order) {
-    bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
+    if (!order) {
+      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
+      return;
+    }
+
+    if (order.status === 'скасовано') {
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
+      return;
+    }
+
+    order.status = 'прийнято';
+
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+        action: 'updateStatus',
+        timestamp: order.timestamp,
+        chatId: targetId,
+        status: order.status
+      });
+
+      await bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
+      await bot.sendMessage(adminId, `✅ Замовлення позначено як "прийнято".`);
+      await bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
+    } catch (err) {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+    }
     return;
   }
-
-  if (order.status === 'скасовано') {
-    bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
-    return;
-  }
-
-  order.status = 'прийнято';
-
-  try {
-    await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
-      action: 'updateStatus',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      status: order.status
-    });
-
-    bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-    bot.sendMessage(adminId, `✅ Замовлення позначено як "прийнято".`);
-    bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
-  } catch (err) {
-    console.error('❌ Помилка оновлення статусу:', err.message);
-    bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-  }
-  return;
-}
 
   // ❌ Скасувати замовлення
   if (data.startsWith('cancel_')) {
@@ -456,7 +490,7 @@ if (request.verified) {
     const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
 
     if (!order || order.status === 'прийнято') {
-      bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
       return;
     }
 
@@ -470,12 +504,12 @@ if (request.verified) {
         status: 'скасовано'
       });
 
-      bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      bot.sendMessage(adminId, `❌ Замовлення від @${user.username} було скасовано.`);
-      bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
+      await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
+      await bot.sendMessage(adminId, `❌ Замовлення від @${user.username} було скасовано.`);
+      await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
-      bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
     }
     return;
   }
@@ -484,11 +518,12 @@ if (request.verified) {
   if (data.startsWith('ttn_')) {
     const [_, targetId, timestamp] = data.split('_');
     pendingTTN[adminId] = { targetId, timestamp };
-    bot.sendMessage(adminId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
-    bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(adminId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
+    await bot.answerCallbackQuery(query.id);
     return;
   }
 });
+
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -582,7 +617,6 @@ bot.on('message', async (msg) => {
     }
     return;
   }
-
 
 
   // 🔒 Заборонити доступ неверифікованим
