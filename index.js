@@ -361,7 +361,41 @@ console.log('📥 Отримано callback_query:', query.data);
     return;
   }
   const chatId = query.message.chat.id;
-  
+  if (data.startsWith('verify_')) {
+    const targetChatId = data.split('_')[1];
+    const request = verificationRequests[targetChatId];
+
+    if (!request) {
+      await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
+      return;
+    }
+
+    await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...', show_alert: false });
+
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+        action: 'addUser',
+        name: request.name,
+        username: request.username || '', // якщо є
+        chatId: targetChatId,
+        phone: request.phone,
+        town: request.town,
+        workplace: request.workplace,
+        verifierName: request.verifierName
+      });
+
+      await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
+      await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
+
+      delete verificationRequests[targetChatId];
+    } catch (err) {
+      console.error('❌ Помилка при додаванні користувача:', err.message);
+      await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
+    }
+  }
+if (request.verified) {
+  return bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
+}
 
   if (data.startsWith('msg_')) {
     const targetId = data.split('_')[1];
@@ -549,41 +583,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-if (data.startsWith('verify_')) {
-    const targetChatId = data.split('_')[1];
-    const request = verificationRequests[targetChatId];
 
-    if (!request) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
-      return;
-    }
-
-    await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...', show_alert: false });
-
-    try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
-        action: 'addUser',
-        name: request.name,
-        username: request.username || '', // якщо є
-        chatId: targetChatId,
-        phone: request.phone,
-        town: request.town,
-        workplace: request.workplace,
-        verifierName: request.verifierName
-      });
-
-      await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
-      await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
-
-      delete verificationRequests[targetChatId];
-    } catch (err) {
-      console.error('❌ Помилка при додаванні користувача:', err.message);
-      await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
-    }
-  }
-if (request.verified) {
-  return bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
-}
 
   // 🔒 Заборонити доступ неверифікованим
   if (!isUserVerified && !userIsAdmin) {

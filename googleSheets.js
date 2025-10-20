@@ -3,7 +3,8 @@ const { GoogleAuth } = require('google-auth-library');
 
 // Авторизація через Railway-змінну
 const auth = new GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+  credentials: require('./service-account.json'),
+
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 

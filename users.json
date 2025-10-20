@@ -1,11 +1,21 @@
 {
-  "806265131": {
-    "name": "Деркач Юрій Петрович",
+  "37424845": {
+    "name": "Багінський віктор Олександрович",
     "username": "невідомо",
-    "phone": "677795619",
-    "town": "Вінниця",
-    "workplace": "Вінницька обласна лікарня імені Пирогова",
-    "verifierName": "Присяжнюк людмила Ігорівна",
+    "phone": "636726706",
+    "town": "Славута",
+    "workplace": "Верітас",
+    "verifierName": "Анна",
+    "verified": true,
+    "orders": []
+  },
+  "54154084": {
+    "name": "Чернієнко Максим Миколайови",
+    "username": "невідомо",
+    "phone": "63383871",
+    "town": "Київ",
+    "workplace": "КМКЛ №12",
+    "verifierName": "Гриценко Павло Васильович",
     "verified": true,
     "orders": []
   },
@@ -19,6 +29,16 @@
     "verified": true,
     "orders": []
   },
+  "340209579": {
+    "name": "Кябуру Дмитро Марічелович",
+    "username": "невідомо",
+    "phone": "955771118",
+    "town": "Чернівці",
+    "workplace": "ВОКНП ЧЛШМД",
+    "verifierName": "Інга",
+    "verified": true,
+    "orders": []
+  },
   "410559447": {
     "name": "Бєльскова Каріна Святославівна",
     "username": "невідомо",
@@ -26,6 +46,26 @@
     "town": "Одеса",
     "workplace": "КНП МКЛ11 ОМР",
     "verifierName": "?",
+    "verified": true,
+    "orders": []
+  },
+  "423016309": {
+    "name": "Гаврилович Віктор Ілліч",
+    "username": "incomparabil",
+    "phone": "669625666",
+    "town": "Київ",
+    "workplace": "Adonis, Viva",
+    "verifierName": "Інга",
+    "verified": true,
+    "orders": []
+  },
+  "806265131": {
+    "name": "Деркач Юрій Петрович",
+    "username": "невідомо",
+    "phone": "677795619",
+    "town": "Вінниця",
+    "workplace": "Вінницька обласна лікарня імені Пирогова",
+    "verifierName": "Присяжнюк людмила Ігорівна",
     "verified": true,
     "orders": []
   },
@@ -49,55 +89,24 @@
     "verified": true,
     "orders": []
   },
-  "423016309": {
-    "name": "Гаврилович Віктор Ілліч",
-    "username": "incomparabil",
-    "phone": "669625666",
+  "655630264": {
+    "name": "Комашко Сергій Олександрович",
+    "username": "serhiiKo90",
+    "phone": "504366713",
     "town": "Київ",
-    "workplace": "Adonis, Viva",
-    "verifierName": "Інга",
+    "workplace": "Фармаско",
+    "verifierName": "Адмін",
     "verified": true,
     "orders": []
   },
   "1369221782": {
     "name": "Гриценко Павло Васильович",
-    "username": "невідомо",
-    "phone": "932168042",
-    "town": "Українка",
-    "workplace": "Фармаско",
-    "verifierName": "Гриценко Павло Васильович",
-    "verified": true,
-    "orders": []
-  },
-  "54154084": {
-    "name": "Чернієнко Максим Миколайови",
-    "username": "невідомо",
-    "phone": "63383871",
+    "username": "Невідомо",
+    "phone": "932168041",
     "town": "Київ",
-    "workplace": "КМКЛ №12",
-    "verifierName": "Гриценко Павло Васильович",
-    "verified": true,
-    "orders": []
-  },
-  "37424845": {
-    "name": "Багінський віктор Олександрович",
-    "username": "невідомо",
-    "phone": "636726706",
-    "town": "Славута",
-    "workplace": "Верітас",
-    "verifierName": "Анна",
-    "verified": true,
-    "orders": []
-  },
-  "340209579": {
-    "name": "Кябуру Дмитро Марічелович",
-    "username": "невідомо",
-    "phone": "955771118",
-    "town": "Чернівці",
-    "workplace": "ВОКНП ЧЛШМД",
-    "verifierName": "Інга",
+    "workplace": "Фармаско",
+    "verifierName": "Адмін",
     "verified": true,
     "orders": []
   }
 }
-
