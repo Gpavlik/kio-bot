@@ -691,7 +691,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
       timestamp: order.timestamp,
       chatId: targetId,
       ttn: text,
-      status: order.status
+      status: 'відправлено'
     });
 
     await bot.sendMessage(targetId, userMessage);
@@ -732,8 +732,8 @@ if (order) {
     return;
   }
 
-  if (!order.address) {
-    order.address = text;
+  if (!order.name) {
+    order.name = text;
     bot.sendMessage(chatId, `📮 Вкажіть номер відділення Нової Пошти:`);
     return;
   }
@@ -787,18 +787,19 @@ if (order) {
       await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
         action: 'add',
         timestamp: order.timestamp,
-        chatId,
-        name: order.name,
-        username: user.username,
-        quantity: order.quantity,
-        city: order.city,
-        np: order.np,
-        phone: order.phone,
-        status: order.status,
+  chatId,
+  name: order.name, // 👈 ПІБ
+  username: user.username,
+  quantity: order.quantity,
+  city: order.city,
+  address: order.name, // 👈 дублюємо ПІБ в address
+  np: order.np,
+  phone: order.phone,
+  status: 'очікує',
         date: order.date,
         time: order.time
       });
-      console.log(`✅ Замовлення записано для ${order.address}`);
+      console.log(`✅ Замовлення записано для ${order.name}`);
     } catch (err) {
       console.error(`❌ Помилка запису замовлення: ${err.message}`);
       adminChatIds.forEach(id => {
@@ -952,7 +953,7 @@ if (userIsAdmin && text === '📋 Переглянути всі замовлен
     found = true;
     report += `👤 @${user.username || 'невідомо'} (${user.name || 'Невідомо'})\n`;
     user.orders.forEach((order, i) => {
-      report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.address}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
+      report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.name}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
     });
   }
 
