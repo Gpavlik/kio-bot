@@ -389,13 +389,13 @@ bot.on('callback_query', async (query) => {
     const newKeyboard = {
       inline_keyboard: [
         [
-          { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
+          { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${timestamp}` }
         ]
       ]
     };
 
        try {
-      const res = await axios.post(SCRIPT_URL, {
+      const res = await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
         action: 'updateStatus',
         timestamp,
         chatId,
