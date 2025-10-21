@@ -411,7 +411,7 @@ bot.on('callback_query', async (query) => {
       });
 
       await bot.answerCallbackQuery(query.id, { text: '✅ Замовлення прийнято' });
-      bot.sendMessage(chatId, `✅ Ваше замовлення прийнято до обробки!`);
+      await bot.sendMessage(chatId, `✅ Ваше замовлення прийнято до обробки!`);
       await bot.sendMessage(adminId, `📦 Статус оновлено: прийнято для ${orderId}`);
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
