@@ -357,6 +357,33 @@ bot.on('callback_query', async (query) => {
     }
     return;
   }
+if (data.startsWith('accept_')) {
+  const [_, targetId, timestamp] = data.split('_');
+  const orderId = `${targetId}_${timestamp}`;
+  const order = ordersById[orderId];
+
+  if (!order) {
+    bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено' });
+    return;
+  }
+
+  // оновлюємо повідомлення з кнопкою ТТН
+  const newKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
+      ]
+    ]
+  };
+
+  bot.editMessageReplyMarkup(newKeyboard, {
+    chat_id: query.message.chat.id,
+    message_id: query.message.message_id
+  });
+
+  bot.answerCallbackQuery(query.id, { text: '✅ Замовлення прийнято' });
+  return;
+}
 
   // ✉️ Повідомлення користувачу
   if (data.startsWith('msg_')) {
@@ -609,39 +636,48 @@ bot.on('message', async (msg) => {
   }
 
   // 📦 Введення ТТН
-  if (userIsAdmin && pendingTTN[chatId]) {
-    const { targetId, timestamp } = pendingTTN[chatId];
-    const orderId = `${targetId}_${timestamp}`;
-    console.log('🔍 Шукаємо orderId:', orderId);
+ if (userIsAdmin && pendingTTN[chatId]) {
+  const { targetId, timestamp } = pendingTTN[chatId];
+  const orderId = `${targetId}_${timestamp}`;
+  console.log('🔍 Шукаємо orderId:', orderId);
 
-    const order = ordersById[orderId];
-    if (!order) {
-      bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
-      delete pendingTTN[chatId];
-      return;
-    }
-
-    order.ttn = text;
-
-    try {
-      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
-        action: 'updateTTN',
-        timestamp: order.timestamp,
-        chatId: targetId,
-        ttn: text
-      });
-
-      bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
-      bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
-    } catch (err) {
-      console.error('❌ Помилка надсилання ТТН:', err.message);
-      bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
-    }
-
+  const order = ordersById[orderId];
+  if (!order) {
+    bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
     delete pendingTTN[chatId];
     return;
   }
 
+  order.ttn = text;
+  const unitPrice = 8500;
+  const amount = order.quantity * unitPrice;
+
+  const userMessage = `Шановний(а) ${order.name}, ваше замовлення підтверджено:\n\n` +
+    `📦 Ваше замовлення:\n` +
+    `• Кількість: ${order.quantity} уп.\n` +
+    `• Місто: ${order.city}\n` +
+    `• Сума: ${amount.toLocaleString('uk-UA')} грн\n` +
+    `• ТТН: ${text}\n\n` +
+    `Дякуємо за замовлення!`;
+
+  try {
+    await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
+      action: 'updateTTN',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      ttn: text
+    });
+
+    await bot.sendMessage(targetId, userMessage);
+    await bot.sendMessage(chatId, `✅ Відповідь на замовлення №${orderId} відправлено`);
+  } catch (err) {
+    console.error('❌ Помилка надсилання ТТН:', err.message);
+    bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
+  }
+
+  delete pendingTTN[chatId];
+  return;
+}
 
   // 🛒 Початок замовлення
 if (text === '🛒 Зробити замовлення') {
@@ -743,16 +779,14 @@ if (order) {
       if (!id || isNaN(id)) return;
       bot.sendMessage(id, `📬 НОВЕ ЗАМОВЛЕННЯ від @${user.username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
         reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-              { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-            ],
-            [
-              { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${order.timestamp}` }
-            ]
-          ]
-        }
+  inline_keyboard: [
+    [
+      { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+      { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+    ]
+  ]
+}
+
       });
     });
 
