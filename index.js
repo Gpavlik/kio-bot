@@ -23,20 +23,29 @@ let cachedUsers = [];
 function isAdmin(chatId) {
   return adminChatIds.includes(Number(chatId));
 }
-
 function isVerified(chatId) {
-  return cachedUsers.some(u => String(u.chatId) === String(chatId));
+  return cachedUsers.some(u => String(u.chatId) === String(chatId) && u.verified);
 }
 
 async function syncUsersFromSheet() {
   try {
     const response = await axios.get('https://script.google.com/macros/s/ТВОЯ_URL_СЮДИ/exec?action=getUsers');
-    cachedUsers = response.data.users || [];
+    const rawUsers = response.data.users || [];
+
+    cachedUsers = rawUsers.map(u => ({
+      chatId: String(u.chatId),
+      name: u.name || 'Невідомо',
+      username: u.username || 'невідомо',
+      verified: true,
+      orders: [] // ⬅️ якщо хочеш — можеш заповнювати з таблиці
+    }));
+
     console.log(`✅ Завантажено ${cachedUsers.length} користувачів з Google Sheets`);
   } catch (err) {
     console.error('❌ Не вдалося завантажити користувачів з таблиці:', err.message);
   }
 }
+
 
 function getMainKeyboard(chatId) {
   if (!isVerified(chatId) && !isAdmin(chatId)) return undefined;
@@ -60,6 +69,15 @@ function safeSend(chatId, text, options) {
     lastSent[chatId] = now;
   }
 }
+
+bot.onText(/\/reloadusers/, async (msg) => {
+  const chatId = msg.chat.id;
+  if (!isAdmin(chatId)) return;
+
+  await syncUsersFromSheet();
+  bot.sendMessage(chatId, `🔄 Кеш користувачів оновлено. Завантажено ${cachedUsers.length} записів.`);
+});
+
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
