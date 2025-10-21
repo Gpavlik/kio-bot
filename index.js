@@ -29,7 +29,7 @@ function isVerified(chatId) {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/ТВОЯ_URL_СЮДИ/exec?action=getUsers');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec?action=getUsers');
     const rawUsers = response.data.users || [];
 
     cachedUsers = rawUsers.map(u => ({
@@ -242,7 +242,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
       action: 'getHistory',
       chatId
     });
@@ -272,8 +272,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', { action: 'getStats' }),
-      axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', { action: 'getUserOrderStats' })
+      axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', { action: 'getStats' }),
+      axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
@@ -337,7 +337,7 @@ bot.on('callback_query', async (query) => {
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
         action: 'addUser',
         name: request.name,
         username: request.username || '',
@@ -384,7 +384,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'прийнято';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -414,7 +414,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'скасовано';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -614,7 +614,7 @@ bot.on('message', async (msg) => {
     order.ttn = text;
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
         action: 'updateTTN',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -706,7 +706,7 @@ if (order) {
 
     // 📤 Надсилання в Google Таблицю
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
         action: 'add',
         timestamp: order.timestamp,
         chatId,
