@@ -1,43 +1,44 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const { getUsersFromSheet, isVerified: isVerifiedFromSheet } = require('./googleSheets');
 
 const token = process.env.BOT_TOKEN;
-const ordersById = {}; // глобально
-const pendingMessage = {};
-
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
   .map(id => Number(id.trim()))
   .filter(id => !isNaN(id));
 
-function isAdmin(chatId) {
-  return adminChatIds.includes(Number(chatId));
-}
-
-const bot = new TelegramBot(token, { polling: true });
-
-const {
-  loadUsers,
-  updateUser,
-  isVerified,
-  getUser,
-  users,
-  verifiedUsers
-} = require('./userManager');
-
-loadUsers();
-
+const ordersById = {};
+const pendingMessage = {};
 const verificationRequests = {};
 const activeOrders = {};
 const pendingMessages = [];
 const pendingTTN = {};
 let currentReplyTarget = null;
 const lastSent = {};
+let cachedUsers = [];
+
+function isAdmin(chatId) {
+  return adminChatIds.includes(Number(chatId));
+}
+
+function isVerified(chatId) {
+  return cachedUsers.some(u => String(u.chatId) === String(chatId));
+}
+
+async function syncUsersFromSheet() {
+  try {
+    const response = await axios.get('https://script.google.com/macros/s/ТВОЯ_URL_СЮДИ/exec?action=getUsers');
+    cachedUsers = response.data.users || [];
+    console.log(`✅ Завантажено ${cachedUsers.length} користувачів з Google Sheets`);
+  } catch (err) {
+    console.error('❌ Не вдалося завантажити користувачів з таблиці:', err.message);
+  }
+}
 
 function getMainKeyboard(chatId) {
-  if (!verifiedUsers.has(chatId) && !isAdmin(chatId)) return undefined;
+  if (!isVerified(chatId) && !isAdmin(chatId)) return undefined;
+
   return {
     reply_markup: {
       keyboard: [
@@ -57,7 +58,6 @@ function safeSend(chatId, text, options) {
     lastSent[chatId] = now;
   }
 }
-
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from || {};
@@ -66,7 +66,7 @@ bot.onText(/\/start/, async (msg) => {
   console.log(`➡️ /start від ${chatId} (@${username})`);
 
   try {
-    const verified = await isVerified(chatId);
+    const verified = isVerified(chatId);
     const isAdminUser = isAdmin(chatId);
 
     console.log(`🔍 Статус: isAdmin=${isAdminUser}, isVerified=${verified}`);
@@ -84,126 +84,71 @@ bot.onText(/\/start/, async (msg) => {
       return;
     }
 
-    // Ініціалізація користувача
-    if (!users[chatId]) {
-      users[chatId] = {
-        name: displayName,
-        username: username || 'невідомо',
-        orders: [],
-        verificationRequested: false,
-        verified: true
-      };
-      updateUser(chatId, users[chatId]);
-    }
-
-    verifiedUsers.add(chatId);
-
     const keyboard = getMainKeyboard(chatId);
-    bot.sendMessage(
-      chatId,
-      `👋 Вітаю, ${users[chatId].name}! Оберіть опцію з меню нижче:`,
-      keyboard || {}
-    );
+    bot.sendMessage(chatId, `👋 Вітаю, ${displayName}! Оберіть опцію з меню нижче:`, keyboard || {});
   } catch (error) {
     console.error('❌ Помилка при перевірці доступу:', error.message);
     bot.sendMessage(chatId, `⚠️ Виникла помилка при перевірці доступу. Спробуйте пізніше.`);
   }
 });
-
-
-
-// ✅ Верифікація вручну
 bot.onText(/\/verify (\d+)/, (msg, match) => {
   if (!isAdmin(msg.chat.id)) return;
   const targetId = parseInt(match[1], 10);
 
-  verifiedUsers.add(targetId);
-  users[targetId] = users[targetId] || {
-    name: 'Невідомо',
-    username: 'невідомо',
-    orders: [],
-    verificationRequested: false
-  };
-  users[targetId].justVerified = true;
-
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `✅ Користувач ${targetId} верифікований.`);
-  });
+  if (!cachedUsers.some(u => String(u.chatId) === String(targetId))) {
+    cachedUsers.push({ chatId: String(targetId) });
+  }
 
   bot.sendMessage(targetId, `🔓 Вам надано доступ до бота. Можете почати користування.`, getMainKeyboard(targetId));
+  adminChatIds.forEach(id => bot.sendMessage(id, `✅ Користувач ${targetId} верифікований.`));
 });
-
-// ❌ Відкликання доступу
 bot.onText(/\/unverify (\d+)/, (msg, match) => {
   if (!isAdmin(msg.chat.id)) return;
   const targetId = parseInt(match[1], 10);
 
-  verifiedUsers.delete(targetId);
-
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `🚫 Користувач ${targetId} більше не має доступу.`);
-  });
+  cachedUsers = cachedUsers.filter(u => String(u.chatId) !== String(targetId));
 
   bot.sendMessage(targetId, `🔒 Ваш доступ до бота було відкликано оператором.`);
+  adminChatIds.forEach(id => bot.sendMessage(id, `🚫 Користувач ${targetId} більше не має доступу.`));
 });
-
-// 📩 Відповідь оператором
 bot.onText(/\/reply (\d+) (.+)/, (msg, match) => {
   if (!isAdmin(msg.chat.id)) return;
   const targetId = parseInt(match[1], 10);
   const replyText = match[2];
 
   bot.sendMessage(targetId, `📩 Повідомлення від оператора:\n${replyText}`);
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `✅ Відповідь надіслано.`);
-  });
+  adminChatIds.forEach(id => bot.sendMessage(id, `✅ Відповідь надіслано.`));
 });
-
-// 🚚 Підтвердження доставки
 bot.onText(/\/send (\d+)/, (msg, match) => {
   if (!isAdmin(msg.chat.id)) return;
   const targetId = parseInt(match[1], 10);
-  const user = getUser(targetId);
+  const user = cachedUsers.find(u => String(u.chatId) === String(targetId));
 
   if (!user || !user.orders || user.orders.length === 0) {
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `⛔️ Замовлення не знайдено.`);
-    });
+    adminChatIds.forEach(id => bot.sendMessage(id, `⛔️ Замовлення не знайдено.`));
     return;
   }
 
   const order = user.orders[user.orders.length - 1];
 
   if (order.status === 'скасовано') {
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `⛔️ Це замовлення вже скасовано.`);
-    });
+    adminChatIds.forEach(id => bot.sendMessage(id, `⛔️ Це замовлення вже скасовано.`));
     return;
   }
 
   if (order.status !== 'прийнято') {
     order.status = 'прийнято';
     bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `✅ Замовлення від @${user.username} позначено як "прийнято".`);
-    });
+    adminChatIds.forEach(id => bot.sendMessage(id, `✅ Замовлення від @${user.username || 'невідомо'} позначено як "прийнято".`));
     return;
   }
 
   bot.sendMessage(targetId, `🚚 Ваше замовлення вже в дорозі! Дякуємо за довіру ❤️`);
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `✅ Доставку підтверджено.`);
-  });
+  adminChatIds.forEach(id => bot.sendMessage(id, `✅ Доставку підтверджено.`));
 });
 let broadcastPayload = { text: null, photoPath: null };
 let broadcastMode = false;
+
 
 // 🔘 Запуск режиму розсилки
 bot.onText(/\/broadcast/, (msg) => {
@@ -212,10 +157,7 @@ bot.onText(/\/broadcast/, (msg) => {
   broadcastMode = true;
   broadcastPayload = { text: null, photoPath: null };
 
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
-  });
+  bot.sendMessage(msg.chat.id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
 });
 
 // 🚀 Відправка розсилки
@@ -224,17 +166,17 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   const { text, photoPath } = broadcastPayload;
   if (!text) {
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `⚠️ Спочатку надішліть текст повідомлення.`);
-    });
+    bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення.`);
     return;
   }
 
   let success = 0;
   let failed = 0;
 
-  for (const id of verifiedUsers) {
+  for (const user of cachedUsers) {
+    const id = Number(user.chatId);
+    if (!id || isNaN(id)) continue;
+
     try {
       if (photoPath) {
         await bot.sendPhoto(id, photoPath, { caption: text });
@@ -246,16 +188,16 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
       console.error(`❌ Не вдалося надіслати ${id}:`, err.message);
       failed++;
     }
+
+    await new Promise(res => setTimeout(res, 1000)); // throttle 1 сек
   }
 
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-    bot.sendMessage(id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
-  });
-
+  bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photoPath: null };
-  broadcastMode = false; // 🔚 Вихід з режиму
+  broadcastMode = false;
 });
+
+// 🧭 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
   if (!isAdmin(chatId)) {
@@ -269,11 +211,12 @@ bot.onText(/\/adminpanel/, (msg) => {
         ['📩 Відповісти користувачу', '📊 Статистика'],
         ['📢 Зробити розсилку', '🔙 Назад до користувацького меню']
       ],
-      resize_keyboard: true,
-      one_time_keyboard: false
+      resize_keyboard: true
     }
   });
 });
+
+// 📜 Історія замовлень
 bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
@@ -300,6 +243,8 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати історію: ${err.message}`);
   }
 });
+
+// 📊 Статистика
 bot.onText(/📊 Статистика/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAdmin(chatId)) return;
@@ -313,6 +258,10 @@ bot.onText(/📊 Статистика/, async (msg) => {
     const orders = orderRes.data;
     const users = userRes.data;
 
+    if (!users || !Array.isArray(users.users)) {
+      return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
+    }
+
     const header = `📊 Статистика замовлень:\n` +
       `🔢 Всього: ${orders.total}\n` +
       `✅ Прийнято: ${orders.accepted}\n` +
@@ -323,17 +272,11 @@ bot.onText(/📊 Статистика/, async (msg) => {
       `📦 З замовленнями: ${users.withOrders}\n` +
       `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
       `📋 Користувачі:`; 
-console.log('📦 Відповідь getUserOrderStats:', users);
 
-const buttons = users.users.map(u => [{
-  text: `${u.name} (${u.town}) — ${u.lastOrderDate}, ${u.totalAcceptedQuantity} уп.`,
-  callback_data: `msg_${u.chatId}`
-}]);
-
-
-if (!users || !Array.isArray(users.users)) {
-  return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
-}
+    const buttons = users.users.map(u => [{
+      text: `${u.name} (${u.town}) — ${u.lastOrderDate}, ${u.totalAcceptedQuantity} уп.`,
+      callback_data: `msg_${u.chatId}`
+    }]);
 
     bot.sendMessage(chatId, header, {
       reply_markup: {
@@ -345,12 +288,6 @@ if (!users || !Array.isArray(users.users)) {
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
   }
 });
-
-
-
-const fs = require('fs');
-const path = require('path');
-
 bot.on('callback_query', async (query) => {
   const adminId = query.message.chat.id;
   const data = query.data;
@@ -369,16 +306,14 @@ bot.on('callback_query', async (query) => {
     const request = verificationRequests[targetChatId];
 
     if (!request) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
-      return;
+      return bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
     }
 
     if (request.verified) {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
-      return;
+      return bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
     }
 
-    await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...', show_alert: false });
+    await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
       await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
@@ -394,31 +329,19 @@ bot.on('callback_query', async (query) => {
 
       await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
       await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
-
       delete verificationRequests[targetChatId];
     } catch (err) {
       console.error('❌ Помилка при додаванні користувача:', err.message);
-      console.log(`✅ Верифіковано: ${request.name} (${targetChatId})`);
-
       await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
     }
     return;
   }
 
-  // ✉️ Надіслати повідомлення користувачу
+  // ✉️ Повідомлення користувачу
   if (data.startsWith('msg_')) {
     const targetId = data.split('_')[1];
     pendingMessage[chatId] = targetId;
     await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
-    await bot.answerCallbackQuery(query.id);
-    return;
-  }
-
-  // ✍️ Відповісти користувачу
-  if (data.startsWith('reply_')) {
-    const targetId = parseInt(data.split('_')[1], 10);
-    currentReplyTarget = targetId;
-    await bot.sendMessage(adminId, `✍️ Напишіть відповідь для користувача ${targetId}`);
     await bot.answerCallbackQuery(query.id);
     return;
   }
@@ -430,13 +353,11 @@ bot.on('callback_query', async (query) => {
     const order = ordersById[orderId];
 
     if (!order) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
-      return;
+      return bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
     }
 
     if (order.status === 'скасовано') {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
-      return;
+      return bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
     }
 
     order.status = 'прийнято';
@@ -459,15 +380,14 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  // ❌ Скасувати замовлення
+  // ❌ Скасування замовлення
   if (data.startsWith('cancel_')) {
     const [_, targetId, timestamp] = data.split('_');
-    const user = getUser(targetId);
+    const user = cachedUsers.find(u => String(u.chatId) === String(targetId));
     const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
 
     if (!order || order.status === 'прийнято') {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
-      return;
+      return bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
     }
 
     order.status = 'скасовано';
@@ -481,7 +401,7 @@ bot.on('callback_query', async (query) => {
       });
 
       await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      await bot.sendMessage(adminId, `❌ Замовлення від @${user.username} було скасовано.`);
+      await bot.sendMessage(adminId, `❌ Замовлення від @${user.username || 'невідомо'} було скасовано.`);
       await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
@@ -500,14 +420,14 @@ bot.on('callback_query', async (query) => {
   }
 });
 
-
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
   const { first_name, username } = msg.from || {};
-  const user = getUser(chatId) || {};
   const userIsAdmin = isAdmin(chatId);
-  const isUserVerified = await isVerified(chatId);
+  const isUserVerified = isVerified(chatId);
+  const user = cachedUsers.find(u => String(u.chatId) === String(chatId)) || {};
+
   if (text === '/adminpanel') return;
 
   console.log(`📩 Повідомлення від ${chatId} (@${username}) | isAdmin=${userIsAdmin} | isVerified=${isUserVerified} | text="${text}"`);
@@ -528,8 +448,8 @@ bot.on('message', async (msg) => {
     return;
   }
 
-// ✉️ Надсилання повідомлення користувачу
-   if (userIsAdmin && pendingMessage[chatId]) {
+  // ✉️ Надсилання повідомлення користувачу
+  if (userIsAdmin && pendingMessage[chatId]) {
     const targetId = pendingMessage[chatId];
     bot.sendMessage(targetId, `📩 Повідомлення від адміністратора:\n\n${text}`);
     bot.sendMessage(chatId, `✅ Повідомлення надіслано.`);
@@ -579,28 +499,24 @@ bot.on('message', async (msg) => {
 
         adminChatIds.forEach(id => {
           if (!id || isNaN(id)) return;
-          try {
-            bot.sendMessage(id, `🔐 Запит на верифікацію:\n👤 ${request.name}\n📞 ${request.phone}\n🏙️ ${request.town}\n🏢 ${request.workplace}\n👤 Співробітник: ${request.verifierName}\n🆔 chatId: ${chatId}`, {
-              reply_markup: {
-                inline_keyboard: [[{ text: '✅ Надати доступ', callback_data: `verify_${chatId}` }]]
-              }
-            });
-          } catch (err) {
-            console.error(`❌ Не вдалося надіслати запит адміну ${id}:`, err.message);
-          }
+          bot.sendMessage(id, `🔐 Запит на верифікацію:\n👤 ${request.name}\n📞 ${request.phone}\n🏙️ ${request.town}\n🏢 ${request.workplace}\n👤 Співробітник: ${request.verifierName}\n🆔 chatId: ${chatId}`, {
+            reply_markup: {
+              inline_keyboard: [[{ text: '✅ Надати доступ', callback_data: `verify_${chatId}` }]]
+            }
+          });
         });
         return;
     }
     return;
   }
 
-
   // 🔒 Заборонити доступ неверифікованим
   if (!isUserVerified && !userIsAdmin) {
     bot.sendMessage(chatId, `🔒 Ви ще не верифіковані. Натисніть /start або зверніться до оператора.`);
     return;
   }
-  // 📢 Режим розсилки (ізольований)
+
+  // 📢 Режим розсилки
   if (userIsAdmin && broadcastMode) {
     if (msg.photo) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
@@ -617,7 +533,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    return; // 🔒 Не обробляти інші команди під час розсилки
+    return;
   }
 
   // ❓ Задати запитання
@@ -634,7 +550,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // 📬 Відповідь адміністратора користувачу
+  // 📬 Відповідь адміністратора
   if (userIsAdmin && currentReplyTarget) {
     bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
     bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
@@ -662,155 +578,157 @@ bot.on('message', async (msg) => {
   }
 
   // 📦 Введення ТТН
- if (userIsAdmin && pendingTTN[chatId]) {
-  const { targetId, timestamp } = pendingTTN[chatId]; // 🔧 Ось тут ми отримуємо змінні
+  if (userIsAdmin && pendingTTN[chatId]) {
+    const { targetId, timestamp } = pendingTTN[chatId];
+    const orderId = `${targetId}_${timestamp}`;
+    console.log('🔍 Шукаємо orderId:', orderId);
 
-  const orderId = `${targetId}_${timestamp}`;
-  console.log('🔍 Шукаємо orderId:', orderId);
+    const order = ordersById[orderId];
+    if (!order) {
+      bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
+      delete pendingTTN[chatId];
+      return;
+    }
 
-  const order = ordersById[orderId];
-  if (!order) {
-    bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
+    order.ttn = text;
+
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+        action: 'updateTTN',
+        timestamp: order.timestamp,
+        chatId: targetId,
+        ttn: text
+      });
+
+      bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
+      bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
+    } catch (err) {
+      console.error('❌ Помилка надсилання ТТН:', err.message);
+      bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
+    }
+
     delete pendingTTN[chatId];
     return;
   }
 
-  order.ttn = text;
 
-  try {
-    await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
-      action: 'updateTTN',
-      timestamp: order.timestamp,
-      chatId: targetId,
-      ttn: text
-    });
-
-    bot.sendMessage(targetId, `📦 Ваш номер ТТН: ${text}`);
-    bot.sendMessage(chatId, `✅ ТТН надіслано користувачу.`);
-  } catch (err) {
-    console.error('❌ Помилка надсилання ТТН:', err.message);
-    bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
-  }
-
-  delete pendingTTN[chatId];
+  // 🛒 Початок замовлення
+if (text === '🛒 Зробити замовлення') {
+  activeOrders[chatId] = {};
+  bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
   return;
 }
 
-  // 🛒 Початок замовлення
-  if (text === '🛒 Зробити замовлення') {
-    activeOrders[chatId] = {};
-    bot.sendMessage(chatId, `📦 Скільки одиниць товару бажаєте замовити?`);
+// 🧾 Обробка замовлення
+const order = activeOrders[chatId];
+if (order) {
+  if (!order.quantity) {
+    if (!/^\d+$/.test(text)) {
+      bot.sendMessage(chatId, `❗ Введіть кількість у вигляді числа (наприклад: 1, 2, 3...)`);
+      return;
+    }
+    order.quantity = text;
+    bot.sendMessage(chatId, `🏙 Вкажіть місто доставки:`);
     return;
   }
 
-  // 🧾 Обробка замовлення
-  const order = activeOrders[chatId];
-  if (order) {
-    if (!order.quantity) {
-      if (!/^\d+$/.test(text)) {
-        bot.sendMessage(chatId, `❗ Введіть кількість у вигляді числа (наприклад: 1, 2, 3...)`);
-        return;
-      }
-      order.quantity = text;
-      bot.sendMessage(chatId, `🏙 Вкажіть місто доставки:`);
+  if (!order.city) {
+    order.city = text;
+    bot.sendMessage(chatId, `👤 Вкажіть ПІБ отримувача:`);
+    return;
+  }
+
+  if (!order.address) {
+    order.address = text;
+    bot.sendMessage(chatId, `📮 Вкажіть номер відділення Нової Пошти:`);
+    return;
+  }
+
+  if (!order.np) {
+    order.np = text;
+    bot.sendMessage(chatId, `📞 Вкажіть ваш номер телефону для зв’язку:`);
+    order.phone = '__awaiting__';
+    return;
+  }
+
+  if (order.phone === '__awaiting__') {
+    if (!/^(\+380|0)\d{9}$/.test(text)) {
+      bot.sendMessage(chatId, `❗ Будь ласка, введіть коректний номер телефону.`);
       return;
     }
 
-    if (!order.city) {
-      order.city = text;
-      bot.sendMessage(chatId, `👤 Вкажіть ПІБ отримувача:`);
-      return;
+    order.phone = text;
+    order.timestamp = Date.now();
+    order.status = 'очікує';
+
+    // 🆕 Зберігаємо в ordersById
+    const orderId = `${chatId}_${order.timestamp}`;
+    ordersById[orderId] = order;
+    console.log('✅ Збережено orderId:', orderId);
+
+    // 🧾 Додаємо замовлення до cachedUsers
+    let user = cachedUsers.find(u => String(u.chatId) === String(chatId));
+    if (!user) {
+      user = {
+        chatId: String(chatId),
+        name: msg.from?.first_name || 'Невідомо',
+        username: msg.from?.username || 'невідомо',
+        orders: []
+      };
+      cachedUsers.push(user);
     }
 
-    if (!order.address) {
-      order.address = text;
-      bot.sendMessage(chatId, `📮 Вкажіть номер відділення Нової Пошти:`);
-      return;
-    }
+    user.orders = user.orders || [];
+    user.orders.push(order);
 
-    if (!order.np) {
-      order.np = text;
-      bot.sendMessage(chatId, `📞 Вкажіть ваш номер телефону для зв’язку:`);
-      order.phone = '__awaiting__';
-      return;
-    }
+    bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
-    if (order.phone === '__awaiting__') {
-      if (!/^(\+380|0)\d{9}$/.test(text)) {
-        bot.sendMessage(chatId, `❗ Будь ласка, введіть коректний номер телефону.`);
-        return;
-      }
-
-   order.phone = text;
-order.timestamp = Date.now();
-order.status = 'очікує';
-
-if (!users[chatId]) {
-  users[chatId] = {
-    name: msg.from?.first_name || 'Невідомо',
-    username: msg.from?.username || 'невідомо',
-    orders: [],
-    verified: false
-  };
-}
-
-users[chatId].orders = users[chatId].orders || [];
-users[chatId].orders.push(order);
-
-// 🆕 Зберігаємо в ordersById
-const orderId = `${chatId}_${order.timestamp}`;
-ordersById[orderId] = order;
-console.log('✅ Збережено orderId:', orderId);
-
-
-      bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
-
-      // 📤 Надсилання в Google Таблицю
-      try {
-        await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
-          action: 'add',
-          timestamp: order.timestamp,
-          chatId,
-          name: users[chatId].name,
-          username: users[chatId].username,
-          quantity: order.quantity,
-          city: order.city,
-          address: order.address,
-          np: order.np,
-          phone: order.phone,
-          status: order.status
-        });
-        console.log(`✅ Замовлення записано для ${order.address}`);
-      } catch (err) {
-        console.error(`❌ Помилка запису замовлення: ${err.message}`);
-        adminChatIds.forEach(id => {
-          if (!id || isNaN(id)) return;
-          bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${users[chatId].username}: ${err.message}`);
-        });
-      }
-
-      // 📢 Повідомлення адміністраторам
+    // 📤 Надсилання в Google Таблицю
+    try {
+      await axios.post('https://script.google.com/macros/s/AKfycbyXqrt9FohFAPqoKbvBrDAkvzaKBtDteWm7MJuFfvHGHIeRtd8725mqsTV_w1n1wsJn/exec', {
+        action: 'add',
+        timestamp: order.timestamp,
+        chatId,
+        name: user.name,
+        username: user.username,
+        quantity: order.quantity,
+        city: order.city,
+        address: order.address,
+        np: order.np,
+        phone: order.phone,
+        status: order.status
+      });
+      console.log(`✅ Замовлення записано для ${order.address}`);
+    } catch (err) {
+      console.error(`❌ Помилка запису замовлення: ${err.message}`);
       adminChatIds.forEach(id => {
         if (!id || isNaN(id)) return;
-        bot.sendMessage(id, `📬 НОВЕ ЗАМОВЛЕННЯ від @${users[chatId].username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-                { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-              ],
-              [
-                { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${order.timestamp}` }
-              ]
-            ]
-          }
-        });
+        bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${user.username}: ${err.message}`);
       });
-
-      delete activeOrders[chatId];
-      return;
     }
+
+    // 📢 Повідомлення адміністраторам
+    adminChatIds.forEach(id => {
+      if (!id || isNaN(id)) return;
+      bot.sendMessage(id, `📬 НОВЕ ЗАМОВЛЕННЯ від @${user.username}\n\n📦 ${order.quantity} шт\n🏙 ${order.city}\n👤 ${order.address}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+              { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+            ],
+            [
+              { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${order.timestamp}` }
+            ]
+          ]
+        }
+      });
+    });
+
+    delete activeOrders[chatId];
+    return;
   }
+}
 
 
   // ℹ️ Інформація
@@ -921,13 +839,12 @@ if (userIsAdmin && text === '📋 Переглянути всі замовлен
   let report = '📋 Усі замовлення:\n\n';
   let found = false;
 
-  for (const uid in users) {
-    const u = users[uid];
-    if (!u.orders || u.orders.length === 0) continue;
+  for (const user of cachedUsers) {
+    if (!user.orders || user.orders.length === 0) continue;
 
     found = true;
-    report += `👤 @${u.username} (${u.name})\n`;
-    u.orders.forEach((order, i) => {
+    report += `👤 @${user.username || 'невідомо'} (${user.name || 'Невідомо'})\n`;
+    user.orders.forEach((order, i) => {
       report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.address}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
     });
   }
@@ -935,7 +852,6 @@ if (userIsAdmin && text === '📋 Переглянути всі замовлен
   bot.sendMessage(chatId, found ? report : '📭 Немає замовлень.');
   return;
 }
-
 
 // 📢 Зробити розсилку
 if (userIsAdmin && text === '📢 Зробити розсилку') {
@@ -963,6 +879,8 @@ if (userIsAdmin && text === '🚚 Підтвердити доставку') {
   bot.sendMessage(chatId, `📦 Натисніть кнопку "📦 Надіслати ТТН" під замовленням, щоб ввести номер.`);
   return;
 }
+
+// 🔙 Назад до користувацького меню
 if (text === '🔙 Назад до користувацького меню') {
   bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
   return;
