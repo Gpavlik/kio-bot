@@ -396,37 +396,58 @@ if (data.startsWith('accept_')) {
 
   // ✅ Прийняти замовлення
   if (data.startsWith('accept_')) {
-    const [_, targetId, timestamp] = data.split('_');
-    const orderId = `${targetId}_${timestamp}`;
-    const order = ordersById[orderId];
+  const [_, targetId, timestamp] = data.split('_');
+  const orderId = `${targetId}_${timestamp}`;
+  const order = ordersById[orderId];
 
-    if (!order) {
-      return bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
-    }
-
-    if (order.status === 'скасовано') {
-      return bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
-    }
-
-    order.status = 'прийнято';
-
-    try {
-      await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
-        action: 'updateStatus',
-        timestamp: order.timestamp,
-        chatId: targetId,
-        status: order.status
-      });
-
-      await bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято і вже в дорозі!`);
-      await bot.sendMessage(adminId, `✅ Замовлення позначено як "прийнято".`);
-      await bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
-    } catch (err) {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
-    }
-    return;
+  if (!order) {
+    return bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
   }
+
+  if (order.status === 'скасовано') {
+    return bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
+  }
+
+  order.status = 'прийнято';
+
+  try {
+    // ✅ Оновлення статусу в Google Sheets
+    await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
+      action: 'updateStatus',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      status: order.status
+    });
+
+    // ✅ Повідомлення користувачу
+    await bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято в роботу`);
+
+    // ✅ Повідомлення адміну
+    const adminText = `✅ Замовлення ${order.name} ${order.date} ${order.time} прийнято в роботу`;
+    await bot.sendMessage(query.from.id, adminText);
+
+    // ✅ Оновлення клавіатури: додаємо кнопку ТТН
+    const newKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
+        ]
+      ]
+    };
+    await bot.editMessageReplyMarkup(newKeyboard, {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id
+    });
+
+    await bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
+  } catch (err) {
+    console.error('❌ Помилка оновлення статусу:', err.message);
+    await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+  }
+
+  return;
+}
+
 
   // ❌ Скасування замовлення
   if (data.startsWith('cancel_')) {
@@ -636,7 +657,7 @@ bot.on('message', async (msg) => {
   }
 
   // 📦 Введення ТТН
- if (userIsAdmin && pendingTTN[chatId]) {
+if (userIsAdmin && pendingTTN[chatId]) {
   const { targetId, timestamp } = pendingTTN[chatId];
   const orderId = `${targetId}_${timestamp}`;
   console.log('🔍 Шукаємо orderId:', orderId);
@@ -649,6 +670,8 @@ bot.on('message', async (msg) => {
   }
 
   order.ttn = text;
+  order.status = 'відправлено';
+
   const unitPrice = 8500;
   const amount = order.quantity * unitPrice;
 
@@ -660,16 +683,19 @@ bot.on('message', async (msg) => {
     `• ТТН: ${text}\n\n` +
     `Дякуємо за замовлення!`;
 
+  const adminMessage = `📤 Відповідь на замовлення ${order.name} ${order.date} ${order.time} відправлено`;
+
   try {
     await axios.post('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
-      ttn: text
+      ttn: text,
+      status: order.status
     });
 
     await bot.sendMessage(targetId, userMessage);
-    await bot.sendMessage(chatId, `✅ Відповідь на замовлення №${orderId} відправлено`);
+    await bot.sendMessage(chatId, adminMessage);
   } catch (err) {
     console.error('❌ Помилка надсилання ТТН:', err.message);
     bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
@@ -678,6 +704,7 @@ bot.on('message', async (msg) => {
   delete pendingTTN[chatId];
   return;
 }
+
 
   // 🛒 Початок замовлення
 if (text === '🛒 Зробити замовлення') {
