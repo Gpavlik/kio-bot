@@ -339,7 +339,7 @@ bot.on('callback_query', async (query) => {
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
-      await axios.post(SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
         action: 'addUser',
         name: request.name,
         username: request.username || '',
@@ -398,7 +398,7 @@ bot.on('callback_query', async (query) => {
     };
 
     try {
-      await axios.post(SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
         action: 'updateStatus',
         timestamp,
         chatId: targetId,
@@ -438,7 +438,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'скасовано';
 
     try {
-      await axios.post(SCRIPT_URL, {
+      await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
