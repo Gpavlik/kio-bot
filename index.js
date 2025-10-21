@@ -370,18 +370,15 @@ bot.on('callback_query', async (query) => {
   }
 
   // ✅ Прийняти замовлення
-  if (data.startsWith('accept_')) {
-    const [_, targetId, timestamp] = data.split('_');
-    const orderId = `${targetId}_${timestamp}`;
+ if (data.startsWith('accept_')) {
+    const [_, chatIdStr, timestampStr] = data.split('_');
+    const chatId = Number(chatIdStr);
+    const timestamp = Number(timestampStr);
+    const orderId = `${chatId}_${timestamp}`;
+
     const order = ordersById[orderId];
-
     if (!order) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено' });
-      return;
-    }
-
-    if (order.status === 'скасовано') {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
+      await bot.sendMessage(adminId, `❌ Замовлення не знайдено: ${orderId}`);
       return;
     }
 
@@ -397,25 +394,26 @@ bot.on('callback_query', async (query) => {
       ]
     };
 
-    try {
-      await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
+       try {
+      const res = await axios.post(SCRIPT_URL, {
         action: 'updateStatus',
         timestamp,
-        chatId: targetId,
+        chatId,
         status: 'прийнято'
       });
+
+      console.log('✅ Статус оновлено:', res.data);
       
       await bot.editMessageReplyMarkup(newKeyboard, {
         chat_id: query.message.chat.id,
         message_id: query.message.message_id
       });
 
-      await bot.answerCallbackQuery(query.id, { text: '✅ Замовлення прийнято' });
       await bot.sendMessage(chatId, `✅ Ваше замовлення прийнято до обробки!`);
-      await bot.sendMessage(adminId, `📦 Статус оновлено: прийнято для ${orderId}`);
+      await bot.sendMessage(adminId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${chatId})`);
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
-      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+      await bot.sendMessage(adminId, `❌ Помилка оновлення статусу: ${err.message}`);
     }
     return;
   }
