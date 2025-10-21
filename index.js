@@ -29,7 +29,7 @@ function isVerified(chatId) {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycby-qwkOTp4krH5kzOFbsL3i1sphMY8zTLbplmDovY_kXYjyVcV-9Ce-fQBDrCq2Rmyc/exec?action=getUsers');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec');
     const rawUsers = response.data.users || [];
 
     cachedUsers = rawUsers.map(u => ({
@@ -242,7 +242,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
       action: 'getHistory',
       chatId
     });
@@ -272,8 +272,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', { action: 'getStats' }),
-      axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', { action: 'getUserOrderStats' })
+      axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', { action: 'getStats' }),
+      axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
@@ -319,7 +319,7 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  const chatId = query.message.chat.id;
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec';
 
   // ✅ Верифікація користувача
   if (data.startsWith('verify_')) {
@@ -327,17 +327,19 @@ bot.on('callback_query', async (query) => {
     const request = verificationRequests[targetChatId];
 
     if (!request) {
-      return bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
+      await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
+      return;
     }
 
     if (request.verified) {
-      return bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
+      return;
     }
 
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
+      await axios.post(SCRIPT_URL, {
         action: 'addUser',
         name: request.name,
         username: request.username || '',
@@ -357,76 +359,36 @@ bot.on('callback_query', async (query) => {
     }
     return;
   }
-if (data.startsWith('accept_')) {
-  const [_, targetId, timestamp] = data.split('_');
-  const orderId = `${targetId}_${timestamp}`;
-  const order = ordersById[orderId];
 
-  if (!order) {
-    bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено' });
-    return;
-  }
-
-  // оновлюємо повідомлення з кнопкою ТТН
-  const newKeyboard = {
-    inline_keyboard: [
-      [
-        { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
-      ]
-    ]
-  };
-
-  bot.editMessageReplyMarkup(newKeyboard, {
-    chat_id: query.message.chat.id,
-    message_id: query.message.message_id
-  });
-
-  bot.answerCallbackQuery(query.id, { text: '✅ Замовлення прийнято' });
-  return;
-}
-
-  // ✉️ Повідомлення користувачу
+  // ✉️ Повідомлення користувачу (оператор відповідає конкретному користувачу)
   if (data.startsWith('msg_')) {
     const targetId = data.split('_')[1];
-    pendingMessage[chatId] = targetId;
-    await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
+    pendingMessage[adminId] = targetId;
+    await bot.sendMessage(adminId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
     await bot.answerCallbackQuery(query.id);
     return;
   }
 
   // ✅ Прийняти замовлення
   if (data.startsWith('accept_')) {
-  const [_, targetId, timestamp] = data.split('_');
-  const orderId = `${targetId}_${timestamp}`;
-  const order = ordersById[orderId];
+    const [_, targetId, timestamp] = data.split('_');
+    const orderId = `${targetId}_${timestamp}`;
+    const order = ordersById[orderId];
 
-  if (!order) {
-    return bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
-  }
+    if (!order) {
+      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено' });
+      return;
+    }
 
-  if (order.status === 'скасовано') {
-    return bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
-  }
+    if (order.status === 'скасовано') {
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Замовлення вже скасовано.' });
+      return;
+    }
 
-  order.status = 'прийнято';
+    // оновлюємо локальний статус
+    order.status = 'прийнято';
 
-  try {
-    // ✅ Оновлення статусу в Google Sheets
-    await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
-    action: 'updateStatus',
-  timestamp: order.timestamp,
-  chatId: targetId,
-  status: 'прийнято'
-});
-
-    // ✅ Повідомлення користувачу
-    await bot.sendMessage(targetId, `🚚 Ваше замовлення прийнято в роботу`);
-
-    // ✅ Повідомлення адміну
-    const adminText = `✅ Замовлення ${order.name} ${order.date} ${order.time} прийнято в роботу`;
-    await bot.sendMessage(query.from.id, adminText);
-
-    // ✅ Оновлення клавіатури: додаємо кнопку ТТН
+    // оновлюємо повідомлення з кнопкою ТТН
     const newKeyboard = {
       inline_keyboard: [
         [
@@ -434,20 +396,28 @@ if (data.startsWith('accept_')) {
         ]
       ]
     };
-    await bot.editMessageReplyMarkup(newKeyboard, {
-      chat_id: query.message.chat.id,
-      message_id: query.message.message_id
-    });
 
-    await bot.answerCallbackQuery(query.id, { text: '✅ Прийнято' });
-  } catch (err) {
-    console.error('❌ Помилка оновлення статусу:', err.message);
-    await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+    try {
+      await axios.post(SCRIPT_URL, {
+        action: 'updateStatus',
+        timestamp,
+        chatId: targetId,
+        status: 'прийнято'
+      });
+
+      await bot.editMessageReplyMarkup(newKeyboard, {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id
+      });
+
+      await bot.answerCallbackQuery(query.id, { text: '✅ Замовлення прийнято' });
+      await bot.sendMessage(adminId, `📦 Статус оновлено: прийнято для ${orderId}`);
+    } catch (err) {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+    }
+    return;
   }
-
-  return;
-}
-
 
   // ❌ Скасування замовлення
   if (data.startsWith('cancel_')) {
@@ -455,14 +425,20 @@ if (data.startsWith('accept_')) {
     const user = cachedUsers.find(u => String(u.chatId) === String(targetId));
     const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
 
-    if (!order || order.status === 'прийнято') {
-      return bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
+    if (!order) {
+      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
+      return;
+    }
+
+    if (order.status === 'прийнято') {
+      await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
+      return;
     }
 
     order.status = 'скасовано';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
+      await axios.post(SCRIPT_URL, {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -470,7 +446,7 @@ if (data.startsWith('accept_')) {
       });
 
       await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      await bot.sendMessage(adminId, `❌ Замовлення від @${user.username || 'невідомо'} було скасовано.`);
+      await bot.sendMessage(adminId, `❌ Замовлення від @${user?.username || 'невідомо'} було скасовано.`);
       await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
@@ -487,6 +463,9 @@ if (data.startsWith('accept_')) {
     await bot.answerCallbackQuery(query.id);
     return;
   }
+
+  // невідома дія
+  await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія' });
 });
 
 bot.on('message', async (msg) => {
@@ -686,7 +665,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
   const adminMessage = `📤 Відповідь на замовлення ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -784,7 +763,7 @@ if (order) {
 
     // 📤 Надсилання в Google Таблицю
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyBSmDQLcRGzf3L_QkPAFj6gb_urFI4G8QwhmsYVUhQTSYiy6XQcOmFk4w-TgXDf25Y/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec', {
         action: 'add',
         timestamp: order.timestamp,
   chatId,
