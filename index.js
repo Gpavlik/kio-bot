@@ -3,6 +3,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
 const token = process.env.BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true }); // 🔧 ВАЖЛИВО: створити bot ДО safeSend
+
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
   .map(id => Number(id.trim()))
@@ -58,6 +60,7 @@ function safeSend(chatId, text, options) {
     lastSent[chatId] = now;
   }
 }
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const { first_name, username } = msg.from || {};
