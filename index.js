@@ -453,6 +453,16 @@ bot.on('message', async (msg) => {
 
   console.log(`📩 Повідомлення від ${chatId} (@${username}) | isAdmin=${userIsAdmin} | isVerified=${isUserVerified} | text="${text}"`);
 
+
+  // Якщо це не команда (типу /start) і користувач верифікований
+  if (!msg.text.startsWith('/') && isVerified(chatId)) {
+    const keyboard = getMainKeyboard(chatId);
+    if (keyboard) {
+      bot.sendMessage(chatId, '📲 Головне меню доступне:', keyboard);
+    }
+  }
+
+
   // 🔘 /start — запуск верифікації або головного меню
   if (text === '/start') {
     if (isUserVerified) {
