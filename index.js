@@ -29,9 +29,9 @@ function isVerified(chatId) {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbwMlbXze_q7mg_RkuBSFF1Rfzf9IkxidS2C8-iTCuXFUFYnbxbxIn0YPbgAf23xRvFm/exec?action=getUsers');
     const rawUsers = response.data.users || [];
-
+console.log('📦 Вміст відповіді:', response.data);
     cachedUsers = rawUsers.map(u => ({
       chatId: String(u.chatId),
       name: u.name || 'Невідомо',
