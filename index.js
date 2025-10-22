@@ -1,6 +1,7 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const shownMenuOnce = new Set(); // зберігає chatId, яким вже показали меню
 
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true }); // 🔧 ВАЖЛИВО: створити bot ДО safeSend
@@ -503,7 +504,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
   // ✅ Підтвердження користувачу
   let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
   if (order.paymentMethod === 'передплата') {
-    confirmText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+    confirmText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ:  2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
   }
 
   bot.sendMessage(chatId, confirmText);
@@ -549,7 +550,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
       `💰 Оплата: ${order.paymentMethod}`;
 
     if (order.paymentMethod === 'передплата') {
-      adminText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+      adminText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ:  2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
     }
 
     bot.sendMessage(id, adminText, {
@@ -612,12 +613,17 @@ bot.on('message', async (msg) => {
 
 
   // Якщо це не команда (типу /start) і користувач верифікований
-  if (!msg.text.startsWith('/') && isVerified(chatId)) {
-    const keyboard = getMainKeyboard(chatId);
-    if (keyboard) {
-      bot.sendMessage(chatId, '📲 Головне меню доступне:', keyboard);
-    }
+if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+  const keyboard = getMainKeyboard(chatId);
+  if (keyboard) {
+    bot.sendMessage(chatId, '📲 Головне меню доступне:', {
+      reply_markup: { keyboard, resize_keyboard: true }
+    });
+    shownMenuOnce.add(chatId); // ✅ запамʼятати, що вже показали
   }
+}
+
+
 
 
   // 🔘 /start — запуск верифікації або головного меню
@@ -870,11 +876,9 @@ if (order.phone === '__awaiting__') {
   bot.sendMessage(chatId, `💰 Оберіть спосіб оплати:`, {
     reply_markup: {
       inline_keyboard: [
-        [
-          { text: '💵 Оплата при отриманні', callback_data: 'payment_cod' },
-          { text: '💳 Передплата', callback_data: 'payment_prepaid' }
-        ]
-      ]
+          [{ text: '💵 Оплата при отриманні', callback_data: 'payment_cod' }],
+          [{ text: '💳 Передплата', callback_data: 'payment_prepaid' }]
+          ]
     }
   });
 
