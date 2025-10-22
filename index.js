@@ -389,6 +389,7 @@ bot.on('callback_query', async (query) => {
     const newKeyboard = {
       inline_keyboard: [
         [
+          { text: '💳 Оплачено', callback_data: `paid_${chatId}_${timestamp}` },
           { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${timestamp}` }
         ]
       ]
@@ -498,7 +499,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
   // ✅ Підтвердження користувачу
   let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
   if (order.paymentMethod === 'передплата') {
-    confirmText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Замовлення ${orderId}`;
+    confirmText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
   }
 
   bot.sendMessage(chatId, confirmText);
@@ -544,7 +545,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
       `💰 Оплата: ${order.paymentMethod}`;
 
     if (order.paymentMethod === 'передплата') {
-      adminText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Замовлення ${orderId}`;
+      adminText += `\n\n💳 Реквізити для оплати:\nIBAN: UA123456789012345678901234567\nЄДРПОУ: 12345678\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
     }
 
     bot.sendMessage(id, adminText, {
