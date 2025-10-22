@@ -315,36 +315,125 @@ bot.onText(/📊 Статистика/, async (msg) => {
   }
 });
 bot.on('callback_query', async (query) => {
-  const adminId = query.message.chat.id;
+  const chatId = query.message.chat.id;
   const data = query.data;
   console.log('📥 Отримано callback_query:', data);
 
-  if (!isAdmin(adminId)) {
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec';
+
+  // === 📦 Дії для користувачів ===
+  if (data === 'payment_cod' || data === 'payment_prepaid') {
+    const order = activeOrders[chatId];
+    if (!order) return;
+
+    order.paymentMethod = data === 'payment_cod' ? 'оплата при отриманні' : 'передплата';
+
+    const now = new Date();
+    order.timestamp = Date.now();
+    order.date = now.toLocaleDateString('uk-UA');
+    order.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    order.status = 'очікує';
+
+    const orderId = `${chatId}_${order.timestamp}`;
+    ordersById[orderId] = order;
+
+    let user = cachedUsers.find(u => String(u.chatId) === String(chatId));
+    if (!user) {
+      user = {
+        chatId: String(chatId),
+        name: query.from?.first_name || 'Невідомо',
+        username: query.from?.username || 'невідомо',
+        orders: []
+      };
+      cachedUsers.push(user);
+    }
+
+    user.orders.push(order);
+
+    let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
+    if (order.paymentMethod === 'передплата') {
+      confirmText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+    }
+
+    bot.sendMessage(chatId, confirmText);
+
+    try {
+      await axios.post(SCRIPT_URL, {
+        action: 'add',
+        timestamp: order.timestamp,
+        chatId,
+        name: order.name,
+        username: user.username,
+        quantity: order.quantity,
+        city: order.city,
+        address: order.name,
+        np: order.np,
+        phone: order.phone,
+        paymentMethod: order.paymentMethod,
+        status: order.status,
+        date: order.date,
+        time: order.time
+      });
+      console.log(`✅ Замовлення записано для ${order.name}`);
+    } catch (err) {
+      console.error(`❌ Помилка запису замовлення: ${err.message}`);
+      adminChatIds.forEach(id => {
+        if (!id || isNaN(id)) return;
+        bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${user.username}: ${err.message}`);
+      });
+    }
+
+    adminChatIds.forEach(id => {
+      if (!id || isNaN(id)) return;
+
+      let adminText =
+        `📬 НОВЕ ЗАМОВЛЕННЯ від @${user.username}\n\n` +
+        `📦 ${order.quantity} шт\n` +
+        `🏙 ${order.city}\n` +
+        `👤 ${order.name}\n` +
+        `📮 НП: ${order.np}\n` +
+        `📞 Телефон: ${order.phone}\n` +
+        `💰 Оплата: ${order.paymentMethod}`;
+
+      if (order.paymentMethod === 'передплата') {
+        adminText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+      }
+
+      bot.sendMessage(id, adminText, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+              { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+            ]
+          ]
+        }
+      });
+    });
+
+    delete activeOrders[chatId];
+    return;
+  }
+
+  // === 🔐 Адмінські дії ===
+  if (!isAdmin(chatId)) {
     await bot.answerCallbackQuery(query.id, { text: '⛔️ Доступ лише для адміністраторів.' });
     return;
   }
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec';
-
-  // ✅ Верифікація користувача
+  // ✅ Верифікація
   if (data.startsWith('verify_')) {
     const targetChatId = data.split('_')[1];
     const request = verificationRequests[targetChatId];
-
-    if (!request) {
+    if (!request || request.verified) {
       await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
-      return;
-    }
-
-    if (request.verified) {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Користувач вже верифікований', show_alert: true });
       return;
     }
 
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec', {
+      await axios.post(SCRIPT_URL, {
         action: 'addUser',
         name: request.name,
         username: request.username || '',
@@ -356,70 +445,65 @@ bot.on('callback_query', async (query) => {
       });
 
       await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
-      await bot.sendMessage(adminId, `✅ Користувача ${request.name} додано до таблиці.`);
+      await bot.sendMessage(chatId, `✅ Користувача ${request.name} додано до таблиці.`);
       delete verificationRequests[targetChatId];
     } catch (err) {
       console.error('❌ Помилка при додаванні користувача:', err.message);
-      await bot.sendMessage(adminId, `❌ Не вдалося додати користувача: ${err.message}`);
+      await bot.sendMessage(chatId, `❌ Не вдалося додати користувача: ${err.message}`);
     }
     return;
   }
 
-  // ✉️ Повідомлення користувачу (оператор відповідає конкретному користувачу)
+  // ✉️ Повідомлення користувачу
   if (data.startsWith('msg_')) {
     const targetId = data.split('_')[1];
-    pendingMessage[adminId] = targetId;
-    await bot.sendMessage(adminId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
+    pendingMessage[chatId] = targetId;
+    await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
     await bot.answerCallbackQuery(query.id);
     return;
   }
 
   // ✅ Прийняти замовлення
- if (data.startsWith('accept_')) {
+  if (data.startsWith('accept_')) {
     const [_, chatIdStr, timestampStr] = data.split('_');
-    const chatId = Number(chatIdStr);
+    const targetId = Number(chatIdStr);
     const timestamp = Number(timestampStr);
-    const orderId = `${chatId}_${timestamp}`;
-
+    const orderId = `${targetId}_${timestamp}`;
     const order = ordersById[orderId];
     if (!order) {
-      await bot.sendMessage(adminId, `❌ Замовлення не знайдено: ${orderId}`);
+      await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
       return;
     }
 
-    // оновлюємо локальний статус
     order.status = 'прийнято';
 
-    // оновлюємо повідомлення з кнопкою ТТН
     const newKeyboard = {
       inline_keyboard: [
         [
-          { text: '💳 Оплачено', callback_data: `paid_${chatId}_${timestamp}` },
-          { text: '📦 Надіслати ТТН', callback_data: `ttn_${chatId}_${timestamp}` }
+          { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` },
+          { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
         ]
       ]
     };
 
-       try {
-      const res = await axios.post('https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec', {
+    try {
+      await axios.post(SCRIPT_URL, {
         action: 'updateStatus',
         timestamp,
-        chatId,
+        chatId: targetId,
         status: 'прийнято'
       });
 
-      console.log('✅ Статус оновлено:', res.data);
-      
       await bot.editMessageReplyMarkup(newKeyboard, {
         chat_id: query.message.chat.id,
         message_id: query.message.message_id
       });
 
-      await bot.sendMessage(chatId, `✅ Ваше замовлення прийнято до обробки!`);
-      await bot.sendMessage(adminId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${chatId})`);
+      await bot.sendMessage(targetId, `✅ Ваше замовлення прийнято до обробки!`);
+      await bot.sendMessage(chatId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${targetId})`);
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
-      await bot.sendMessage(adminId, `❌ Помилка оновлення статусу: ${err.message}`);
+      await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
     }
     return;
   }
@@ -429,13 +513,7 @@ bot.on('callback_query', async (query) => {
     const [_, targetId, timestamp] = data.split('_');
     const user = cachedUsers.find(u => String(u.chatId) === String(targetId));
     const order = user?.orders?.find(o => o.timestamp == Number(timestamp));
-
-    if (!order) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Замовлення не знайдено.' });
-      return;
-    }
-
-    if (order.status === 'прийнято') {
+        if (!order || order.status === 'прийнято') {
       await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
       return;
     }
@@ -443,7 +521,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'скасовано';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec', {
+      await axios.post(SCRIPT_URL, {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -451,7 +529,7 @@ bot.on('callback_query', async (query) => {
       });
 
       await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      await bot.sendMessage(adminId, `❌ Замовлення від @${user?.username || 'невідомо'} було скасовано.`);
+      await bot.sendMessage(chatId, `❌ Замовлення від @${user?.username || 'невідомо'} було скасовано.`);
       await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
     } catch (err) {
       console.error('❌ Помилка оновлення статусу:', err.message);
@@ -463,141 +541,45 @@ bot.on('callback_query', async (query) => {
   // 📦 Введення ТТН
   if (data.startsWith('ttn_')) {
     const [_, targetId, timestamp] = data.split('_');
-    pendingTTN[adminId] = { targetId, timestamp };
-    await bot.sendMessage(adminId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
+    pendingTTN[chatId] = { targetId, timestamp };
+    await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
     await bot.answerCallbackQuery(query.id);
     return;
   }
 
-  // невідома дія
-  await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія' });
+  // 💳 Позначити як оплачено
+  if (data.startsWith('paid_')) {
+    const [_, targetId, timestampStr] = data.split('_');
+    const timestamp = Number(timestampStr);
+    const orderId = `${targetId}_${timestamp}`;
+    const order = ordersById[orderId];
 
-if (data === 'payment_cod' || data === 'payment_prepaid') {
-  const chatId = query.message.chat.id;
-  const order = activeOrders[chatId];
-  if (!order) return;
-
-  order.paymentMethod = data === 'payment_cod' ? 'оплата при отриманні' : 'передплата';
-
-  const now = new Date();
-  order.timestamp = Date.now();
-  order.date = now.toLocaleDateString('uk-UA');
-  order.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-  order.status = 'очікує';
-
-  const orderId = `${chatId}_${order.timestamp}`;
-  ordersById[orderId] = order;
-
-  let user = cachedUsers.find(u => String(u.chatId) === String(chatId));
-  if (!user) {
-    user = {
-      chatId: String(chatId),
-      name: query.from?.first_name || 'Невідомо',
-      username: query.from?.username || 'невідомо',
-      orders: []
-    };
-    cachedUsers.push(user);
-  }
-
-  user.orders.push(order);
-
-  // ✅ Підтвердження користувачу
-  let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
-  if (order.paymentMethod === 'передплата') {
-    confirmText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ:  2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
-  }
-
-  bot.sendMessage(chatId, confirmText);
-
-  // 📤 Надсилання в Google Таблицю
-  try {
-    await axios.post('https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec', {
-      action: 'add',
-      timestamp: order.timestamp,
-      chatId,
-      name: order.name,
-      username: user.username,
-      quantity: order.quantity,
-      city: order.city,
-      address: order.name,
-      np: order.np,
-      phone: order.phone,
-      paymentMethod: order.paymentMethod, // 👈 нове поле
-      status: order.status,
-      date: order.date,
-      time: order.time
-    });
-    console.log(`✅ Замовлення записано для ${order.name}`);
-  } catch (err) {
-    console.error(`❌ Помилка запису замовлення: ${err.message}`);
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${user.username}: ${err.message}`);
-    });
-  }
-
-  // 📢 Повідомлення адміністраторам
-  adminChatIds.forEach(id => {
-    if (!id || isNaN(id)) return;
-
-    let adminText =
-      `📬 НОВЕ ЗАМОВЛЕННЯ від @${user.username}\n\n` +
-      `📦 ${order.quantity} шт\n` +
-      `🏙 ${order.city}\n` +
-      `👤 ${order.name}\n` +
-      `📮 НП: ${order.np}\n` +
-      `📞 Телефон: ${order.phone}\n` +
-      `💰 Оплата: ${order.paymentMethod}`;
-
-    if (order.paymentMethod === 'передплата') {
-      adminText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ:  2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+    if (!order) {
+      await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
+      return;
     }
 
-    bot.sendMessage(id, adminText, {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-            { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-          ]
-        ]
-      }
-    });
-  });
+    try {
+      await axios.post(SCRIPT_URL, {
+        action: 'updatePayment',
+        timestamp,
+        chatId: targetId,
+        paymentStatus: 'оплачено'
+      });
 
-  delete activeOrders[chatId];
-  return;
-}
-if (data.startsWith('paid_')) {
-  const [_, chatIdStr, timestampStr] = data.split('_');
-  const chatId = Number(chatIdStr);
-  const timestamp = Number(timestampStr);
-  const orderId = `${chatId}_${timestamp}`;
-  const order = ordersById[orderId];
-
-  if (!order) {
-    await bot.sendMessage(adminId, `❌ Замовлення не знайдено: ${orderId}`);
+      await bot.sendMessage(targetId, `💳 Ваше замовлення позначено як *оплачене*. Дякуємо!`, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, `✅ Статус оновлено: *оплачено* для ${order.name || 'користувача'} (${targetId})`, { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('❌ Помилка оновлення статусу:', err.message);
+      await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
+    }
     return;
   }
 
-  try {
-    await axios.post('https://script.google.com/macros/s/AKfycbzhAmKFK8d-rzlj80db_5gYTObv6cB2MMdYcPJo4F9E6rmQbe7aL2IFWXzkYiBJSuJG/exec', {
-      action: 'updatePayment',
-      timestamp,
-      chatId,
-      status: 'оплачено'
-    });
-
-    await bot.sendMessage(chatId, `💳 Ваше замовлення позначено як *оплачене*. Дякуємо!`, { parse_mode: 'Markdown' });
-    await bot.sendMessage(adminId, `✅ Статус оновлено: *оплачено* для ${order.name || 'користувача'} (${chatId})`, { parse_mode: 'Markdown' });
-  } catch (err) {
-    console.error('❌ Помилка оновлення статусу:', err.message);
-    await bot.sendMessage(adminId, `❌ Помилка оновлення статусу: ${err.message}`);
-  }
-}
-
-
+  // ❓ Невідома дія
+  await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія' });
 });
+
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
