@@ -29,7 +29,7 @@ function isVerified(chatId) {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec?action=getUsers');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec?action=getUsers');
     const rawUsers = response.data.users || [];
 console.log('📦 Вміст відповіді:', response.data);
     cachedUsers = rawUsers.map(u => ({
@@ -242,7 +242,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
       action: 'getHistory',
       chatId
     });
@@ -272,8 +272,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', { action: 'getStats' }),
-      axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', { action: 'getUserOrderStats' })
+      axios.get('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', { action: 'getStats' }),
+      axios.get('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
@@ -323,7 +323,7 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec';
 
   // ✅ Верифікація користувача
   if (data.startsWith('verify_')) {
@@ -343,7 +343,7 @@ bot.on('callback_query', async (query) => {
     await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
         action: 'addUser',
         name: request.name,
         username: request.username || '',
@@ -400,7 +400,7 @@ bot.on('callback_query', async (query) => {
     };
 
        try {
-      const res = await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+      const res = await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
         action: 'updateStatus',
         timestamp,
         chatId,
@@ -442,7 +442,7 @@ bot.on('callback_query', async (query) => {
     order.status = 'скасовано';
 
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
         action: 'updateStatus',
         timestamp: order.timestamp,
         chatId: targetId,
@@ -510,7 +510,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
 
   // 📤 Надсилання в Google Таблицю
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
       action: 'add',
       timestamp: order.timestamp,
       chatId,
@@ -580,8 +580,8 @@ if (data.startsWith('paid_')) {
   }
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
-      action: 'updateStatus',
+    await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
+      action: 'updatePayment',
       timestamp,
       chatId,
       status: 'оплачено'
@@ -795,7 +795,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
   const adminMessage = `📤 Відповідь на замовлення ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -913,7 +913,7 @@ if (order.phone === '__awaiting__') {
 
     // 📤 Надсилання в Google Таблицю
     try {
-      await axios.post('https://script.google.com/macros/s/AKfycby1A3D-ckgWzoJpxuZaRA9_A_TAGyT22ZmYoLqTioOmJUNvOmzexRd79-X8_U9DQzXf/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbwlm41hoM5pyNKW4yGjwJbtW3g9bwDKd28UouutgxFPYVRShEnIMUmY8lNGrAR8iXkM/exec', {
         action: 'add',
         timestamp: order.timestamp,
   chatId,
