@@ -390,7 +390,7 @@ let userTown = userRow?.town || 'Невідомо';
     });
   }
 
-  // 📬 Повідомлення адміністраторам
+// 📬 Повідомлення адміністраторам
 let adminText =
   `📬 НОВЕ ЗАМОВЛЕННЯ від ${resolvedName}, ${userTown}\n\n` +
   `📦 ${order.quantity} шт\n` +
@@ -400,34 +400,34 @@ let adminText =
   `📞 Телефон: ${order.phone}\n` +
   `💰 Оплата: ${order.paymentMethod}`;
 
-  const paymentDetails =
-    `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+const paymentDetails =
+  `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
 
-  order.adminMessages = [];
+order.adminMessages = [];
 
-  for (const id of adminChatIds) {
-    if (!id || isNaN(id)) continue;
+for (const id of adminChatIds) {
+  if (!id || isNaN(id)) continue;
 
-    const adminText = order.paymentMethod === 'передплата'
-      ? adminText + paymentDetails
-      : adminText;
+  const fullAdminText = order.paymentMethod === 'передплата'
+    ? adminText + paymentDetails
+    : adminText;
 
-    const sent = await bot.sendMessage(id, adminText, {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-            { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-          ]
+  const sent = await bot.sendMessage(id, fullAdminText, {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+          { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
         ]
-      }
-    });
+      ]
+    }
+  });
 
-    order.adminMessages.push({ chatId: id, messageId: sent.message_id });
-  }
+  order.adminMessages.push({ chatId: id, messageId: sent.message_id });
+}
 
-  delete activeOrders[chatId];
-  return;
+delete activeOrders[chatId];
+return;
 }
 
 // 🔐 Адмінські дії
