@@ -40,7 +40,7 @@ function getCustomerSummary(chatId, users, order = {}) {
 
 async function reloadOrdersFromSheet() {
   try {
-    const res = await axios.get('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', {
+    const res = await axios.get('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', {
       params: { action: 'getOrders' }
     });
 
@@ -74,7 +74,7 @@ async function reloadOrdersFromSheet() {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec?action=getUsers');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec?action=getUsers');
     const rawUsers = response.data.users || [];
 
     console.log('📦 Вміст відповіді:', response.data);
@@ -301,7 +301,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', {
       action: 'getHistory',
       chatId
     });
@@ -331,8 +331,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.get('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', { action: 'getStats' }),
-      axios.get('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', { action: 'getUserOrderStats' })
+      axios.get('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', { action: 'getStats' }),
+      axios.get('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
@@ -377,7 +377,7 @@ bot.on('callback_query', async (query) => {
   const data = query.data;
   console.log('📥 Отримано callback_query:', data);
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec';
 
   if (data === 'payment_cod' || data === 'payment_prepaid') {
   const order = activeOrders[chatId];
@@ -412,7 +412,7 @@ bot.on('callback_query', async (query) => {
   const resolvedName = user.name || 'Невідомо';
   const userTown = user.town || 'Невідомо';
 
-  let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
+  let confirmText = `✅ Замовлення надіслано оператору!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
   if (order.paymentMethod === 'передплата') {
     confirmText += `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
   }
@@ -582,11 +582,11 @@ if (data.startsWith('accept_')) {
     // ✅ Оновлюємо статус у таблиці
     await axios.post(SCRIPT_URL, {
       action: 'updateStatus',
-      timestamp,
-      chatId: targetId,
+      timestamp: order.timestamp,
+      chatId: order.chatId,
       status: 'прийнято',
-      operatorName
-    });
+      operatorId: query.from.id // 👈 передаємо chatId оператора
+});
 
     // ✅ Оновлюємо клавіатуру в повідомленнях адміністраторів
     if (order.adminMessages?.length) {
@@ -940,7 +940,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
   const adminMessage = `📤 ТТН на замовлення ${verifiedName} для ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -1072,7 +1072,7 @@ bot.sendMessage(chatId, `✅ Замовлення очікує обробки!\n
 
 // 📤 Надсилання в Google Таблицю
 try {
-      await axios.post('https://script.google.com/macros/s/AKfycbyxWl_DRjv9iE6CvWDwQ7DfygfjephPRsI-jZ4myMBoA9Z4LZuFKoxa618RmlnS_srX/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbyfC0fjj-Y9aUnfFaI4RzKWlONwUFUv1SAVvTvDq9bHbDg0cez1e2TIQcRKmso4qkq1/exec', {
         action: 'add',
     timestamp: order.timestamp,
     chatId,
