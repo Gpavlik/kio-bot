@@ -379,8 +379,7 @@ bot.on('callback_query', async (query) => {
 
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec';
 
-  // === 📦 Дії для користувачів ===
-if (data === 'payment_cod' || data === 'payment_prepaid') {
+  if (data === 'payment_cod' || data === 'payment_prepaid') {
   const order = activeOrders[chatId];
   if (!order) return;
 
@@ -420,6 +419,10 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
 
   await bot.sendMessage(chatId, confirmText);
 
+  // ✅ Додаємо ПІБ оператора
+  const operator = cachedUsers.find(u => String(u.chatId) === String(query.from.id));
+  const operatorName = operator?.name || query.from?.first_name || 'невідомо';
+
   try {
     await axios.post(SCRIPT_URL, {
       action: 'add',
@@ -427,6 +430,7 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
       chatId,
       name: order.name,
       username: user.username,
+      town: user.town || 'Невідомо', // ✅ передаємо місто
       quantity: order.quantity,
       city: order.city,
       address: `${order.city}, НП ${order.np}`,
@@ -436,7 +440,8 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
       paymentStatus: order.paymentStatus,
       status: order.status,
       date: order.date,
-      time: order.time
+      time: order.time,
+      operatorName // ✅ передаємо ПІБ оператора
     });
     console.log(`✅ Замовлення записано для ${order.name}`);
   } catch (err) {
@@ -486,7 +491,6 @@ if (data === 'payment_cod' || data === 'payment_prepaid') {
   delete activeOrders[chatId];
   return;
 }
-
 
 // 🔐 Адмінські дії
 if (!isAdmin(chatId)) {
@@ -1032,88 +1036,95 @@ if (order.phone === '__awaiting__') {
 }
     order.phone = text;
 
-    const now = new Date();
-    order.timestamp = Date.now();
-    order.date = now.toLocaleDateString('uk-UA');
-    order.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+const now = new Date();
+order.timestamp = Date.now();
+order.date = now.toLocaleDateString('uk-UA');
+order.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+order.status = 'очікує';
 
-    order.status = 'очікує';
+// 🆕 Зберігаємо в ordersById
+const orderId = `${chatId}_${order.timestamp}`;
+ordersById[orderId] = order;
+console.log('✅ Збережено orderId:', orderId);
 
-    // 🆕 Зберігаємо в ordersById
-    const orderId = `${chatId}_${order.timestamp}`;
-    ordersById[orderId] = order;
-    console.log('✅ Збережено orderId:', orderId);
+// 🧾 Додаємо замовлення до cachedUsers
+let user = cachedUsers.find(u => String(u.chatId) === String(chatId));
+if (!user) {
+  user = {
+    chatId: String(chatId),
+    name: msg.from?.first_name || 'Невідомо',
+    username: msg.from?.username || 'невідомо',
+    town: order.city || 'Невідомо', // ✅ зберігаємо місто
+    orders: []
+  };
+  cachedUsers.push(user);
+}
 
-    // 🧾 Додаємо замовлення до cachedUsers
-    let user = cachedUsers.find(u => String(u.chatId) === String(chatId));
-    if (!user) {
-      user = {
-        chatId: String(chatId),
-        name: msg.from?.first_name || 'Невідомо',
-        username: msg.from?.username || 'невідомо',
-        orders: []
-      };
-      cachedUsers.push(user);
-    }
+user.orders = user.orders || [];
+user.town = order.city || user.town || 'Невідомо'; // ✅ оновлюємо town
+user.name = user.name || order.name || 'Невідомо'; // ✅ оновлюємо name
+user.orders.push(order);
 
-    user.orders = user.orders || [];
-    user.orders.push(order);
+// ✅ ПІБ оператора
+const operatorName = user.name || msg.from?.first_name || 'невідомо';
 
-    bot.sendMessage(chatId, `✅ Замовлення очікує обробки!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
+bot.sendMessage(chatId, `✅ Замовлення очікує обробки!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
-    // 📤 Надсилання в Google Таблицю
-    try {
+// 📤 Надсилання в Google Таблицю
+try {
       await axios.post('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', {
         action: 'add',
-        timestamp: order.timestamp,
-  chatId,
-  name: order.name, // 👈 ПІБ
-  username: user.username,
-  quantity: order.quantity,
-  city: order.city,
-  address: order.name, // 👈 дублюємо ПІБ в address
-  np: order.np,
-  phone: order.phone,
-  status: 'очікує',
-        date: order.date,
-        time: order.time
-      });
-      console.log(`✅ Замовлення записано для ${order.name}`);
-    } catch (err) {
-      console.error(`❌ Помилка запису замовлення: ${err.message}`);
-      adminChatIds.forEach(id => {
-        if (!id || isNaN(id)) return;
-        bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${user.username}: ${err.message}`);
-      });
+    timestamp: order.timestamp,
+    chatId,
+    name: order.name,
+    username: user.username,
+    town: user.town, // ✅ передаємо місто
+    quantity: order.quantity,
+    city: order.city,
+    address: `${order.city}, НП ${order.np}`, // ✅ повна адреса
+    np: order.np,
+    phone: order.phone,
+    status: 'очікує',
+    date: order.date,
+    time: order.time,
+    operatorName // ✅ передаємо ПІБ оператора
+  });
+  console.log(`✅ Замовлення записано для ${order.name}`);
+} catch (err) {
+  console.error(`❌ Помилка запису замовлення: ${err.message}`);
+  adminChatIds.forEach(id => {
+    if (!id || isNaN(id)) return;
+    bot.sendMessage(id, `⚠️ Не вдалося записати замовлення від @${user.username}: ${err.message}`);
+  });
+}
+
+// 📢 Повідомлення адміністраторам
+adminChatIds.forEach(id => {
+  if (!id || isNaN(id)) return;
+
+  bot.sendMessage(id,
+    `📬 НОВЕ ЗАМОВЛЕННЯ від ${user.name}, ${user.town}\n\n` +
+    `📦 ${order.quantity} шт\n` +
+    `🏙 ${order.city}\n` +
+    `👤 ${order.name}\n` +
+    `📮 НП: ${order.np}\n` +
+    `📞 Телефон: ${order.phone}`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+            { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+          ]
+        ]
+      }
     }
+  );
+});
 
-    // 📢 Повідомлення адміністраторам
-    adminChatIds.forEach(id => {
-      if (!id || isNaN(id)) return;
-
-      bot.sendMessage(id,
-        `📬 НОВЕ ЗАМОВЛЕННЯ від @${user.username}\n\n` +
-        `📦 ${order.quantity} шт\n` +
-        `🏙 ${order.city}\n` +
-        `👤 ${order.name}\n` +
-        `📮 НП: ${order.np}\n` +
-        `📞 Телефон: ${order.phone}`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-                { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
-              ]
-            ]
-          }
-        }
-      );
-    });
-
-    delete activeOrders[chatId];
-    return;
-  }
+delete activeOrders[chatId];
+return;
+}
 }
 
 
@@ -1221,7 +1232,7 @@ KioMedinevsOne в порожнину суглоба. Правильне розм
     bot.sendMessage(chatId, `🔙 Повертаємось до головного меню.`, getMainKeyboard(chatId));
     return;
   }
-  // 📋 Переглянути всі замовлення
+// 📋 Переглянути всі замовлення
 if (userIsAdmin && text === '📋 Переглянути всі замовлення') {
   let report = '📋 Усі замовлення:\n\n';
   let found = false;
@@ -1230,9 +1241,21 @@ if (userIsAdmin && text === '📋 Переглянути всі замовлен
     if (!user.orders || user.orders.length === 0) continue;
 
     found = true;
-    report += `👤 @${user.username || 'невідомо'} (${user.name || 'Невідомо'})\n`;
+    const userName = user.name || 'Невідомо';
+    const userTown = user.town || 'Невідомо';
+    report += `👤 ${userName}, ${userTown} (@${user.username || 'невідомо'})\n`;
+
     user.orders.forEach((order, i) => {
-      report += `  #${i + 1} 📦 ${order.quantity} шт\n  🏙 ${order.city}\n  🏠 ${order.name}\n  📮 НП: ${order.np}\n  📞 ${order.phone}\n  📌 Статус: ${order.status || 'очікує'}\n\n`;
+      const timestamp = order.date && order.time ? `🕒 ${order.date} ${order.time}` : '';
+      report +=
+        `  #${i + 1} 📦 ${order.quantity} шт\n` +
+        `  🏙 ${order.city}\n` +
+        `  👤 ${order.name}\n` +
+        `  📮 НП: ${order.np}\n` +
+        `  📞 ${order.phone}\n` +
+        `  💰 Оплата: ${order.paymentMethod || 'не вказано'}\n` +
+        `  📌 Статус: ${order.status || 'очікує'}\n` +
+        `  ${timestamp}\n\n`;
     });
   }
 
@@ -1257,7 +1280,9 @@ if (userIsAdmin && text === '📩 Відповісти користувачу') 
 
   const next = pendingMessages[0];
   currentReplyTarget = next.chatId;
-  bot.sendMessage(chatId, `✍️ Відповідаєте користувачу @${next.username}:\n\n"${next.text}"`);
+  const name = next.name || 'Невідомо';
+  const town = next.town || 'Невідомо';
+  bot.sendMessage(chatId, `✍️ Відповідаєте користувачу ${name}, ${town} (@${next.username}):\n\n"${next.text}"`);
   return;
 }
 
@@ -1272,7 +1297,6 @@ if (text === '🔙 Назад до користувацького меню') {
   bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
   return;
 }
-
   // 🧼 Catch-all: якщо нічого не спрацювало
   //if (text && !text.startsWith('/')) {
     //bot.sendMessage(chatId, `🤖 Не впізнаю команду. Оберіть опцію з меню нижче:`, getMainKeyboard(chatId));
