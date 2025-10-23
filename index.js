@@ -40,7 +40,7 @@ function getCustomerSummary(chatId, users, order = {}) {
 
 async function reloadOrdersFromSheet() {
   try {
-    const res = await axios.get('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', {
+    const res = await axios.get('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', {
       params: { action: 'getOrders' }
     });
 
@@ -74,7 +74,7 @@ async function reloadOrdersFromSheet() {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec?action=getUsers');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec?action=getUsers');
     const rawUsers = response.data.users || [];
 
     console.log('📦 Вміст відповіді:', response.data);
@@ -301,7 +301,7 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.post('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', {
+    const res = await axios.post('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', {
       action: 'getHistory',
       chatId
     });
@@ -331,8 +331,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.get('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', { action: 'getStats' }),
-      axios.get('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', { action: 'getUserOrderStats' })
+      axios.get('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', { action: 'getStats' }),
+      axios.get('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
@@ -377,7 +377,7 @@ bot.on('callback_query', async (query) => {
   const data = query.data;
   console.log('📥 Отримано callback_query:', data);
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec';
 
   if (data === 'payment_cod' || data === 'payment_prepaid') {
   const order = activeOrders[chatId];
@@ -937,10 +937,10 @@ if (userIsAdmin && pendingTTN[chatId]) {
   `• Сума: ${amount.toLocaleString('uk-UA')} грн\n` +
   `• ТТН: ${text}\n\n` +
   `Дякуємо за замовлення!`;
-  const adminMessage = `📤 Відповідь на замовлення ${order.name} ${order.date} ${order.time} відправлено`;
+  const adminMessage = `📤 Відповідь на замовлення ${verifiedName} для ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
-    await axios.post('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', {
+    await axios.post('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
       chatId: targetId,
@@ -1072,7 +1072,7 @@ bot.sendMessage(chatId, `✅ Замовлення очікує обробки!\n
 
 // 📤 Надсилання в Google Таблицю
 try {
-      await axios.post('https://script.google.com/macros/s/AKfycbypynveLqcJJ61GdVrWnIjWNGYC0idnmYDAKQfOiSVrZp2cellIMgyucs4PvtIhbSFT/exec', {
+      await axios.post('https://script.google.com/macros/s/AKfycbze145W5puvA20LVcgcx2Gilm8wGTu3GeOU7yRDc-1a8ES1l6-mnW6HoPf_4zwwGYbe/exec', {
         action: 'add',
     timestamp: order.timestamp,
     chatId,
