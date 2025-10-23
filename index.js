@@ -481,7 +481,22 @@ if (!isAdmin(chatId)) {
     const orderId = `${targetId}_${timestamp}`;
     const order = ordersById[orderId];
     const operatorUser = cachedUsers.find(u => String(u.chatId) === String(chatId));
-    const operatorName = operatorUser?.name || 'невідомо';
+let operatorName = 'невідомо';
+
+if (operatorUser) {
+  const userSheet = await axios.get(SCRIPT_URL, {
+    params: {
+      action: 'getUsers'
+    }
+  });
+
+  const users = userSheet.data?.users || [];
+  const match = users.find(u => String(u.chatId) === String(chatId));
+  if (match?.name) {
+    operatorName = match.name;
+  }
+}
+
 
 
     if (!order) {
