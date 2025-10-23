@@ -1026,9 +1026,9 @@ if (order.phone === '__awaiting__') {
   bot.sendMessage(chatId, `💰 Оберіть спосіб оплати:`, {
     reply_markup: {
       inline_keyboard: [
-          { text: '💵 Оплата при отриманні', callback_data: 'payment_cod' },
-          { text: '💳 Передплата', callback_data: 'payment_prepaid' }
-          ]
+          [{ text: '💵 Оплата при отриманні', callback_data: 'payment_cod' }],
+          [{ text: '💳 Передплата', callback_data: 'payment_prepaid' }]
+      ]
     }
   });
 
