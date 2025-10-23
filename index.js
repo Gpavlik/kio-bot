@@ -372,17 +372,11 @@ bot.on('callback_query', async (query) => {
   // === 📦 Дії для користувачів ===
 if (data === 'payment_cod' || data === 'payment_prepaid') {
   const order = activeOrders[chatId];
-  const userRow = cachedUsers.find(u => String(u.chatId) === String(chatId));
-let resolvedName = userRow?.name || 'Невідомо';
-let userTown = userRow?.town || 'Невідомо';
-
-  
   if (!order) return;
 
-  order.paymentMethod = data === 'payment_cod' ? 'оплата при отриманні' : 'передплата';
-  order.paymentStatus = 'неоплачено'; // 👈 нове поле
-
   const now = new Date();
+  order.paymentMethod = data === 'payment_cod' ? 'оплата при отриманні' : 'передплата';
+  order.paymentStatus = 'неоплачено';
   order.timestamp = Date.now();
   order.date = now.toLocaleDateString('uk-UA');
   order.time = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
@@ -397,12 +391,17 @@ let userTown = userRow?.town || 'Невідомо';
       chatId: String(chatId),
       name: query.from?.first_name || 'Невідомо',
       username: query.from?.username || 'невідомо',
+      town: 'Невідомо',
+      verified: true,
       orders: []
     };
     cachedUsers.push(user);
   }
 
   user.orders.push(order);
+
+  const resolvedName = user.name || 'Невідомо';
+  const userTown = user.town || 'Невідомо';
 
   let confirmText = `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}\n💰 Оплата: ${order.paymentMethod}`;
   if (order.paymentMethod === 'передплата') {
@@ -420,7 +419,7 @@ let userTown = userRow?.town || 'Невідомо';
       username: user.username,
       quantity: order.quantity,
       city: order.city,
-      address: order.name,
+      address: `${order.city}, НП ${order.np}`,
       np: order.np,
       phone: order.phone,
       paymentMethod: order.paymentMethod,
@@ -438,45 +437,46 @@ let userTown = userRow?.town || 'Невідомо';
     });
   }
 
-// 📬 Повідомлення адміністраторам
-let adminText =
-  `📬 НОВЕ ЗАМОВЛЕННЯ від ${resolvedName}, ${userTown}\n\n` +
-  `📦 ${order.quantity} шт\n` +
-  `🏙 ${order.city}\n` +
-  `👤 ${order.name}\n` +
-  `📮 НП: ${order.np}\n` +
-  `📞 Телефон: ${order.phone}\n` +
-  `💰 Оплата: ${order.paymentMethod}`;
+  // 📬 Повідомлення адміністраторам
+  let adminText =
+    `📬 НОВЕ ЗАМОВЛЕННЯ від ${resolvedName}, ${userTown}\n\n` +
+    `📦 ${order.quantity} шт\n` +
+    `🏙 ${order.city}\n` +
+    `👤 ${order.name}\n` +
+    `📮 НП: ${order.np}\n` +
+    `📞 Телефон: ${order.phone}\n` +
+    `💰 Оплата: ${order.paymentMethod}`;
 
-const paymentDetails =
-  `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
+  const paymentDetails =
+    `\n\n💳 Реквізити для оплати:\nФОП Кирієнко Микола Олексійович\nIBAN: UA023510050000026000879268179\nЄДРПОУ: 2609322450\nАТ "УКРСИББАНК"\nПризначення: Передплата за замовлення від ${order.name}, ${order.date} ${order.time}`;
 
-order.adminMessages = [];
+  order.adminMessages = [];
 
-for (const id of adminChatIds) {
-  if (!id || isNaN(id)) continue;
+  for (const id of adminChatIds) {
+    if (!id || isNaN(id)) continue;
 
-  const fullAdminText = order.paymentMethod === 'передплата'
-    ? adminText + paymentDetails
-    : adminText;
+    const fullAdminText = order.paymentMethod === 'передплата'
+      ? adminText + paymentDetails
+      : adminText;
 
-  const sent = await bot.sendMessage(id, fullAdminText, {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
-          { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+    const sent = await bot.sendMessage(id, fullAdminText, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Прийняти', callback_data: `accept_${chatId}_${order.timestamp}` },
+            { text: '❌ Скасувати', callback_data: `cancel_${chatId}_${order.timestamp}` }
+          ]
         ]
-      ]
-    }
-  });
+      }
+    });
 
-  order.adminMessages.push({ chatId: id, messageId: sent.message_id });
+    order.adminMessages.push({ chatId: id, messageId: sent.message_id });
+  }
+
+  delete activeOrders[chatId];
+  return;
 }
 
-delete activeOrders[chatId];
-return;
-}
 
 // 🔐 Адмінські дії
 if (!isAdmin(chatId)) {
@@ -484,75 +484,66 @@ if (!isAdmin(chatId)) {
   return;
 }
 
-  // ✅ Верифікація
-  if (data.startsWith('verify_')) {
-    const targetChatId = data.split('_')[1];
-    const request = verificationRequests[targetChatId];
-    if (!request || request.verified) {
-      await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
-      return;
-    }
-
-    await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
-
-    try {
-      await axios.post(SCRIPT_URL, {
-        action: 'addUser',
-        name: request.name,
-        username: request.username || '',
-        chatId: targetChatId,
-        phone: request.phone,
-        town: request.town,
-        workplace: request.workplace,
-        verifierName: request.verifierName
-      });
-
-      await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
-      await bot.sendMessage(chatId, `✅ Користувача ${request.name} додано до таблиці.`);
-      delete verificationRequests[targetChatId];
-    } catch (err) {
-      console.error('❌ Помилка при додаванні користувача:', err.message);
-      await bot.sendMessage(chatId, `❌ Не вдалося додати користувача: ${err.message}`);
-    }
-    return;
-  }
-
-  // ✉️ Повідомлення користувачу
-  if (data.startsWith('msg_')) {
-    const targetId = data.split('_')[1];
-    pendingMessage[chatId] = targetId;
-    await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
-    await bot.answerCallbackQuery(query.id);
-    return;
-  }
-
-// ✅ Прийняти замовлення
-if (data.startsWith('accept_')) {
-  const [_, chatIdStr, timestampStr] = data.split('_');
-  const targetId = Number(chatIdStr);
-  const timestamp = Number(timestampStr);
-  const orderId = `${targetId}_${timestamp}`;
-  const order = ordersById[orderId];
- const operatorId = query.from.id;
-let operatorName = 'невідомо';
-
+// ✅ Отримуємо список користувачів один раз
+let users = [];
 try {
   const userSheet = await axios.get(SCRIPT_URL, {
     params: { action: 'getUsers' }
   });
-
-  const users = userSheet.data?.users || [];
-
-  const match = users.find(u => String(u.chatId) === String(operatorId));
-  console.log('🔍 Знайдено оператора:', match);
-
-  if (match?.name) {
-    operatorName = match.name;
-  }
+  users = userSheet.data?.users || [];
 } catch (err) {
-  console.error('❌ Помилка отримання ПІБ оператора:', err.message);
+  console.error('❌ Помилка отримання користувачів:', err.message);
 }
 
+// ✅ Верифікація
+if (data.startsWith('verify_')) {
+  const targetChatId = data.split('_')[1];
+  const request = verificationRequests[targetChatId];
+  if (!request || request.verified) {
+    await bot.answerCallbackQuery(query.id, { text: '❌ Запит не знайдено або вже оброблено', show_alert: true });
+    return;
+  }
+
+  await bot.answerCallbackQuery(query.id, { text: '⏳ Верифікація...' });
+
+  try {
+    await axios.post(SCRIPT_URL, {
+      action: 'addUser',
+      name: request.name,
+      username: request.username || '',
+      chatId: targetChatId,
+      phone: request.phone,
+      town: request.town,
+      workplace: request.workplace,
+      verifierName: request.verifierName
+    });
+
+    await bot.sendMessage(targetChatId, `✅ Вас верифіковано! Доступ надано.`);
+    await bot.sendMessage(chatId, `✅ Користувача ${request.name} додано до таблиці.`);
+    delete verificationRequests[targetChatId];
+  } catch (err) {
+    console.error('❌ Помилка при додаванні користувача:', err.message);
+    await bot.sendMessage(chatId, `❌ Не вдалося додати користувача: ${err.message}`);
+  }
+  return;
+}
+
+// ✉️ Повідомлення користувачу
+if (data.startsWith('msg_')) {
+  const targetId = data.split('_')[1];
+  pendingMessage[chatId] = targetId;
+  await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
+  await bot.answerCallbackQuery(query.id);
+  return;
+}
+
+// ✅ Прийняти замовлення
+if (data.startsWith('accept_')) {
+  const [_, targetIdStr, timestampStr] = data.split('_');
+  const targetId = Number(targetIdStr);
+  const timestamp = Number(timestampStr);
+  const orderId = `${targetId}_${timestamp}`;
+  const order = ordersById[orderId];
 
   if (!order) {
     await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
@@ -560,6 +551,13 @@ try {
   }
 
   order.status = 'прийнято';
+
+  const operator = users.find(u => String(u.chatId) === String(query.from.id));
+  const operatorName = operator?.name || 'невідомо';
+
+  const customer = users.find(u => String(u.chatId) === String(targetId));
+  const customerName = customer?.name || 'Невідомо';
+  const customerTown = customer?.town || 'Невідомо';
 
   const newKeyboard = {
     inline_keyboard: [
@@ -571,7 +569,6 @@ try {
   };
 
   try {
-    // ✅ Оновлюємо статус і записуємо ПІБ оператора в таблицю
     await axios.post(SCRIPT_URL, {
       action: 'updateStatus',
       timestamp,
@@ -580,7 +577,6 @@ try {
       operatorName
     });
 
-    // ✅ Оновлюємо клавіатуру в повідомленнях адміністраторів
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
         try {
@@ -590,130 +586,125 @@ try {
           });
         } catch (err) {
           const description = err.response?.body?.description || '';
-          if (description.includes('message is not modified')) {
-            // нічого страшного — просто не змінюємо
-          } else {
+          if (!description.includes('message is not modified')) {
             console.error(`❌ Помилка редагування клавіатури для ${msg.chatId}:`, err.message);
           }
         }
       }
     }
 
-    // ✅ Повідомляємо користувача і оператора
     await bot.sendMessage(targetId, `✅ Ваше замовлення прийнято та обробляється!`);
-    await bot.sendMessage(chatId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${targetId})`);
+    await bot.sendMessage(chatId, `📦 Статус оновлено: прийнято для ${customerName}, ${customerTown}`);
   } catch (err) {
     console.error('❌ Помилка оновлення статусу замовлення:', err.message);
-    try {
-      await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
-    } catch (sendErr) {
-      console.error('❌ Не вдалося повідомити оператора про помилку:', sendErr.message);
-    }
+    await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
   }
-
   return;
 }
 
-  // ❌ Скасування замовлення
-  if (data.startsWith('cancel_')) {
-    const [_, targetId, timestampStr] = data.split('_');
-    const timestamp = Number(timestampStr);
-    const user = cachedUsers.find(u => String(u.chatId) === String(targetId));
-    const order = user?.orders?.find(o => o.timestamp === timestamp);
+// ❌ Скасування замовлення
+if (data.startsWith('cancel_')) {
+  const [_, targetIdStr, timestampStr] = data.split('_');
+  const targetId = String(targetIdStr);
+  const timestamp = Number(timestampStr);
+  const user = cachedUsers.find(u => String(u.chatId) === targetId);
+  const order = user?.orders?.find(o => o.timestamp === timestamp);
 
-    if (!order || order.status === 'прийнято') {
-      await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
-      return;
-    }
+  if (!order || order.status === 'прийнято') {
+    await bot.answerCallbackQuery(query.id, { text: '⛔️ Не можна скасувати прийняте замовлення.' });
+    return;
+  }
 
-    order.status = 'скасовано';
+  order.status = 'скасовано';
 
-    try {
-      await axios.post(SCRIPT_URL, {
-        action: 'updateStatus',
-        timestamp: order.timestamp,
-        chatId: targetId,
-        status: 'скасовано'
-      });
+  try {
+    await axios.post(SCRIPT_URL, {
+      action: 'updateStatus',
+      timestamp: order.timestamp,
+      chatId: targetId,
+      status: 'скасовано'
+    });
 
-      if (order.adminMessages?.length) {
-        for (const msg of order.adminMessages) {
-          await bot.editMessageReplyMarkup(undefined, {
-            chat_id: msg.chatId,
-            message_id: msg.messageId
-          });
-        }
+    if (order.adminMessages?.length) {
+      for (const msg of order.adminMessages) {
+        await bot.editMessageReplyMarkup(undefined, {
+          chat_id: msg.chatId,
+          message_id: msg.messageId
+        });
       }
-
-      await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
-      await bot.sendMessage(chatId, `❌ Замовлення від @${user?.username || 'невідомо'} було скасовано.`);
-      await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
-    } catch (err) {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
     }
+
+    await bot.sendMessage(targetId, `❌ Ваше замовлення було скасовано оператором.`);
+    await bot.sendMessage(chatId, `❌ Замовлення від @${user?.username || 'невідомо'} було скасовано.`);
+    await bot.answerCallbackQuery(query.id, { text: '❌ Скасовано' });
+  } catch (err) {
+    console.error('❌ Помилка оновлення статусу:', err.message);
+    await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка оновлення' });
+  }
+  return;
+}
+
+// 📦 Введення ТТН
+if (data.startsWith('ttn_')) {
+  const [_, targetId, timestampStr] = data.split('_');
+  const timestamp = Number(timestampStr);
+
+  pendingTTN[chatId] = { targetId, timestamp };
+  await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
+  await bot.answerCallbackQuery(query.id);
+  return;
+}
+
+// 💳 Позначити як оплачено
+if (data.startsWith('paid_')) {
+  const [_, targetIdStr, timestampStr] = data.split('_');
+  const targetId = Number(targetIdStr);
+  const timestamp = Number(timestampStr);
+  const orderId = `${targetId}_${timestamp}`;
+  const order = ordersById[orderId];
+
+  if (!order) {
+    await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
     return;
   }
 
-  // 📦 Введення ТТН
-  if (data.startsWith('ttn_')) {
-    const [_, targetId, timestampStr] = data.split('_');
-    const timestamp = Number(timestampStr);
+  order.paymentStatus = 'оплачено';
 
-    pendingTTN[chatId] = { targetId, timestamp };
-    await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${targetId}:`);
-    await bot.answerCallbackQuery(query.id);
-    return;
-  }
+  try {
+    await axios.post(SCRIPT_URL, {
+      action: 'updatePayment',
+      timestamp,
+      chatId: targetId,
+      paymentStatus: 'оплачено'
+    });
 
-  // 💳 Позначити як оплачено
-  if (data.startsWith('paid_')) {
-    const [_, targetId, timestampStr] = data.split('_');
-    const timestamp = Number(timestampStr);
-    const orderId = `${targetId}_${timestamp}`;
-    const order = ordersById[orderId];
+    const updatedKeyboard = {
+      inline_keyboard: [
+        [{ text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }]
+      ]
+    };
 
-    if (!order) {
-      await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
-      return;
-    }
-    order.paymentStatus = 'оплачено'; // ✅ локальне оновлення
-    try {
-      await axios.post(SCRIPT_URL, {
-        action: 'updatePayment',
-        timestamp,
-        chatId: targetId,
-        paymentStatus: 'оплачено'
-      });
-
-      const updatedKeyboard = {
-        inline_keyboard: [
-          [{ text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }]
-        ]
-      };
-
-      if (order.adminMessages?.length) {
-        for (const msg of order.adminMessages) {
-          await bot.editMessageReplyMarkup(updatedKeyboard, {
-            chat_id: msg.chatId,
-            message_id: msg.messageId
-          });
-        }
+    if (order.adminMessages?.length) {
+      for (const msg of order.adminMessages) {
+        await bot.editMessageReplyMarkup(updatedKeyboard, {
+          chat_id: msg.chatId,
+          message_id: msg.messageId
+        });
       }
-
-      await bot.sendMessage(targetId, `💳 Ваше замовлення позначено як *оплачене*. Дякуємо!`, { parse_mode: 'Markdown' });
-      await bot.sendMessage(chatId, `✅ Статус оновлено: *оплачено* для ${order.name || 'користувача'} (${targetId})`, { parse_mode: 'Markdown' });
-    } catch (err) {
-      console.error('❌ Помилка оновлення статусу:', err.message);
-      await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
     }
-    return;
-  }
 
-  // ❓ Невідома дія
-  await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія' });
+    await bot.sendMessage(targetId, `💳 Ваше замовлення позначено як *оплачене*. Дякуємо!`, { parse_mode: 'Markdown' });
+    await bot.sendMessage(chatId, `✅ Статус оновлено: *оплачено* для ${order.name || 'користувача'} (${targetId})`, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error('❌ Помилка оновлення статусу:', err.message);
+    await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
+  }
+  return;
+}
+
+// ❓ Невідома дія
+await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' });
 });
-
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
