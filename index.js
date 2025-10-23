@@ -20,6 +20,7 @@ const pendingTTN = {};
 let currentReplyTarget = null;
 const lastSent = {};
 let cachedUsers = [];
+await reloadOrdersFromSheet();
 
 function isAdmin(chatId) {
   return adminChatIds.includes(Number(chatId));
@@ -27,6 +28,41 @@ function isAdmin(chatId) {
 function isVerified(chatId) {
   return cachedUsers.some(u => String(u.chatId) === String(chatId) && u.verified);
 }
+async function reloadOrdersFromSheet() {
+  try {
+    const res = await axios.get('https://script.google.com/macros/s/AKfycbz0295wC6KtqcLF3UT72DLGHxHYN2xyeR7F1GnCoV4is-orUVTVmRbnvW8dJtbv5qJR/exec', {
+      params: { action: 'getOrders' }
+    });
+
+    const rows = res.data?.orders || [];
+
+    for (const row of rows) {
+      const chatId = Number(row.chatId);
+      const timestamp = Number(row.timestamp);
+      const orderId = `${chatId}_${timestamp}`;
+
+      ordersById[orderId] = {
+        chatId,
+        timestamp,
+        quantity: row.quantity,
+        city: row.city,
+        name: row.name,
+        np: row.np,
+        phone: row.phone,
+        paymentMethod: row.paymentMethod,
+        status: row.status,
+        date: row.date,
+        time: row.time
+        // можеш додати інші поля, якщо потрібно
+      };
+    }
+
+    console.log(`✅ Завантажено ${rows.length} замовлень у кеш`);
+  } catch (err) {
+    console.error('❌ Помилка завантаження замовлень:', err.message);
+  }
+}
+
 
 async function syncUsersFromSheet() {
   try {
@@ -485,25 +521,26 @@ if (data.startsWith('accept_')) {
   const timestamp = Number(timestampStr);
   const orderId = `${targetId}_${timestamp}`;
   const order = ordersById[orderId];
+ const operatorId = query.from.id;
+let operatorName = 'невідомо';
 
-  let operatorName = 'невідомо';
+try {
+  const userSheet = await axios.get(SCRIPT_URL, {
+    params: { action: 'getUsers' }
+  });
 
-  try {
-    // Отримуємо список користувачів з таблиці Users
-    const userSheet = await axios.get(SCRIPT_URL, {
-      params: { action: 'getUsers' }
-    });
+  const users = userSheet.data?.users || [];
 
-    const users = userSheet.data?.users || [];
+  const match = users.find(u => String(u.chatId) === String(operatorId));
+  console.log('🔍 Знайдено оператора:', match);
 
-    // Знаходимо оператора по chatId
-    const match = users.find(u => String(u.chatId) === String(chatId));
-    if (match?.name) {
-      operatorName = match.name;
-    }
-  } catch (err) {
-    console.error('❌ Помилка отримання ПІБ оператора:', err.message);
+  if (match?.name) {
+    operatorName = match.name;
   }
+} catch (err) {
+  console.error('❌ Помилка отримання ПІБ оператора:', err.message);
+}
+
 
   if (!order) {
     await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
@@ -551,7 +588,7 @@ if (data.startsWith('accept_')) {
     }
 
     // ✅ Повідомляємо користувача і оператора
-    await bot.sendMessage(targetId, `✅ Ваше замовлення очікує обробки!`);
+    await bot.sendMessage(targetId, `✅ Ваше замовлення прийнято та обробляється!`);
     await bot.sendMessage(chatId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${targetId})`);
   } catch (err) {
     console.error('❌ Помилка оновлення статусу замовлення:', err.message);
@@ -993,7 +1030,7 @@ if (order.phone === '__awaiting__') {
     user.orders = user.orders || [];
     user.orders.push(order);
 
-    bot.sendMessage(chatId, `✅ Замовлення прийнято!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
+    bot.sendMessage(chatId, `✅ Замовлення очікує обробки!\n\n📦 Кількість: ${order.quantity}\n🏙 Місто: ${order.city}\n👤 ПІБ: ${order.name}\n📮 НП: ${order.np}\n📞 Телефон: ${order.phone}`);
 
     // 📤 Надсилання в Google Таблицю
     try {
