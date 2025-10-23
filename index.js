@@ -644,7 +644,7 @@ if (data.startsWith('cancel_')) {
 
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
-        await bot.editMessageReplyMarkup(undefined, {
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
           chat_id: msg.chatId,
           message_id: msg.messageId
         });
@@ -954,7 +954,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
     // 🧩 Синхронне оновлення клавіатури у всіх адмінів
     if (order.adminMessages && Array.isArray(order.adminMessages)) {
       for (const msg of order.adminMessages) {
-        await bot.editMessageReplyMarkup(undefined, {
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
           chat_id: msg.chatId,
           message_id: msg.messageId
         });
