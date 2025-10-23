@@ -478,7 +478,7 @@ if (!isAdmin(chatId)) {
     return;
   }
 
- // ✅ Прийняти замовлення
+// ✅ Прийняти замовлення
 if (data.startsWith('accept_')) {
   const [_, chatIdStr, timestampStr] = data.split('_');
   const targetId = Number(chatIdStr);
@@ -522,33 +522,48 @@ if (data.startsWith('accept_')) {
   };
 
   try {
+    // ✅ Оновлюємо статус і записуємо ПІБ оператора в таблицю
     await axios.post(SCRIPT_URL, {
       action: 'updateStatus',
       timestamp,
       chatId: targetId,
       status: 'прийнято',
-      operatorName // 👈 ПІБ з таблиці Users
+      operatorName
     });
 
+    // ✅ Оновлюємо клавіатуру в повідомленнях адміністраторів
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
-        await bot.editMessageReplyMarkup(newKeyboard, {
-          chat_id: msg.chatId,
-          message_id: msg.messageId
-        });
+        try {
+          await bot.editMessageReplyMarkup(newKeyboard, {
+            chat_id: msg.chatId,
+            message_id: msg.messageId
+          });
+        } catch (err) {
+          const description = err.response?.body?.description || '';
+          if (description.includes('message is not modified')) {
+            // нічого страшного — просто не змінюємо
+          } else {
+            console.error(`❌ Помилка редагування клавіатури для ${msg.chatId}:`, err.message);
+          }
+        }
       }
     }
 
-    await bot.sendMessage(targetId, `✅ Ваше замовлення прийнято до обробки!`);
+    // ✅ Повідомляємо користувача і оператора
+    await bot.sendMessage(targetId, `✅ Ваше замовлення очікує обробки!`);
     await bot.sendMessage(chatId, `📦 Статус оновлено: прийнято для ${order.name || 'користувача'} (${targetId})`);
   } catch (err) {
-    console.error('❌ Помилка оновлення статусу:', err.message);
-    await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
+    console.error('❌ Помилка оновлення статусу замовлення:', err.message);
+    try {
+      await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
+    } catch (sendErr) {
+      console.error('❌ Не вдалося повідомити оператора про помилку:', sendErr.message);
+    }
   }
 
   return;
 }
-
 
   // ❌ Скасування замовлення
   if (data.startsWith('cancel_')) {
