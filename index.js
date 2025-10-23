@@ -409,8 +409,8 @@ let adminText =
     if (!id || isNaN(id)) continue;
 
     const adminText = order.paymentMethod === 'передплата'
-      ? adminTextBase + paymentDetails
-      : adminTextBase;
+      ? adminText + paymentDetails
+      : adminText;
 
     const sent = await bot.sendMessage(id, adminText, {
       reply_markup: {
