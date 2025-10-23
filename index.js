@@ -1,10 +1,10 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const shownMenuOnce = new Set(); // зберігає chatId, яким вже показали меню
 
+const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true }); // 🔧 ВАЖЛИВО: створити bot ДО safeSend
+const bot = new TelegramBot(token, { polling: true });
 
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
@@ -20,14 +20,15 @@ const pendingTTN = {};
 let currentReplyTarget = null;
 const lastSent = {};
 let cachedUsers = [];
-await reloadOrdersFromSheet();
 
 function isAdmin(chatId) {
   return adminChatIds.includes(Number(chatId));
 }
+
 function isVerified(chatId) {
   return cachedUsers.some(u => String(u.chatId) === String(chatId) && u.verified);
 }
+
 async function reloadOrdersFromSheet() {
   try {
     const res = await axios.get('https://script.google.com/macros/s/AKfycbz0295wC6KtqcLF3UT72DLGHxHYN2xyeR7F1GnCoV4is-orUVTVmRbnvW8dJtbv5qJR/exec', {
@@ -53,7 +54,6 @@ async function reloadOrdersFromSheet() {
         status: row.status,
         date: row.date,
         time: row.time
-        // можеш додати інші поля, якщо потрібно
       };
     }
 
@@ -63,18 +63,19 @@ async function reloadOrdersFromSheet() {
   }
 }
 
-
 async function syncUsersFromSheet() {
   try {
     const response = await axios.get('https://script.google.com/macros/s/AKfycbz0295wC6KtqcLF3UT72DLGHxHYN2xyeR7F1GnCoV4is-orUVTVmRbnvW8dJtbv5qJR/exec?action=getUsers');
     const rawUsers = response.data.users || [];
-console.log('📦 Вміст відповіді:', response.data);
+
+    console.log('📦 Вміст відповіді:', response.data);
+
     cachedUsers = rawUsers.map(u => ({
       chatId: String(u.chatId),
       name: u.name || 'Невідомо',
       username: u.username || 'невідомо',
       verified: true,
-      orders: [] // ⬅️ якщо хочеш — можеш заповнювати з таблиці
+      orders: []
     }));
 
     console.log(`✅ Завантажено ${cachedUsers.length} користувачів з Google Sheets`);
@@ -82,7 +83,6 @@ console.log('📦 Вміст відповіді:', response.data);
     console.error('❌ Не вдалося завантажити користувачів з таблиці:', err.message);
   }
 }
-
 
 function getMainKeyboard(chatId) {
   if (!isVerified(chatId) && !isAdmin(chatId)) return undefined;
@@ -98,6 +98,18 @@ function getMainKeyboard(chatId) {
     }
   };
 }
+
+// ✅ Стартова точка
+async function startBot() {
+  await reloadOrdersFromSheet();
+  await syncUsersFromSheet();
+
+  console.log('🚀 Бот запущено і кеш оновлено');
+  // тут можна додати bot.on(...) та інші обробники
+}
+
+startBot();
+
 
 function safeSend(chatId, text, options) {
   const now = Date.now();
