@@ -5,6 +5,12 @@ const axios = require('axios');
 const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
+const keyboard = getMainKeyboard(chatId);
+if (!keyboard?.reply_markup?.keyboard || !Array.isArray(keyboard.reply_markup.keyboard)) {
+  console.error('❌ Некоректна клавіатура:', keyboard);
+  bot.sendMessage(chatId, `⚠️ Помилка: клавіатура не може бути показана.`);
+  return;
+}
 
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
@@ -104,7 +110,8 @@ function getMainKeyboard(chatId) {
         [{ text: '📜 Історія замовлень' }, { text: '📞 Зв’язатися з оператором' }],
         [{ text: '❓ Задати запитання' }, { text: '❌ Скасувати' }]
       ],
-      resize_keyboard: true
+      resize_keyboard: true,
+      one_time_keyboard: false
     }
   };
 }
