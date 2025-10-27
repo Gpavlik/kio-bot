@@ -40,7 +40,7 @@ function getCustomerSummary(chatId, users, order = {}) {
 
 async function reloadOrdersFromSheet() {
   try {
-    const res = await axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getUser', {
+    const res = await axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec', {
       params: { action: 'getOrders' }
     });
 
@@ -74,7 +74,7 @@ async function reloadOrdersFromSheet() {
 
 async function syncUsersFromSheet() {
   try {
-    const response = await axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec');
+    const response = await axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getUsers');
     const rawUsers = response.data.users || [];
 
     console.log('📦 Вміст відповіді:', response.data);
