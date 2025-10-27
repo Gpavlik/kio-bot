@@ -339,8 +339,6 @@ bot.onText(/📊 Статистика/, async (msg) => {
       })
     ]);
 
-    ]);
-
     const orders = orderRes.data;
     const users = userRes.data;
 
