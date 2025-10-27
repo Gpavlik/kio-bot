@@ -332,8 +332,8 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec', { action: 'getStats' }),
-      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec', { action: 'getUserOrderStats' })
+      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getStats', { action: 'getStats' }),
+      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getUserOrderStats', { action: 'getUserOrderStats' })
     ]);
 
     const orders = orderRes.data;
