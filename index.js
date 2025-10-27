@@ -339,10 +339,14 @@ bot.onText(/📊 Статистика/, async (msg) => {
       })
     ]);
 
+    ]);
+
     const orders = orderRes.data;
     const users = userRes.data;
 
+    // ✅ Перевірка на валідність
     if (!users || !Array.isArray(users.users)) {
+      console.warn('⚠️ users.users не є масивом:', users);
       return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
     }
 
@@ -360,16 +364,24 @@ bot.onText(/📊 Статистика/, async (msg) => {
       `📦 З замовленнями: ${users.withOrders}\n` +
       `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
       `🧑‍💼 Статистика по операторах:\n` +
-      users.operators.map(op =>
-        `👤 ${op.name} — 👥 ${op.totalUsers} корист., 📦 ${op.totalOrders} зам., ` +
-        `${op.totalQuantity} уп., 💰 ${op.totalProfit.toLocaleString('uk-UA')} грн`
-      ).join('\n') +
+      (Array.isArray(users.operators)
+        ? users.operators.map(op =>
+            `👤 ${op.name} — 👥 ${op.totalUsers} корист., 📦 ${op.totalOrders} зам., ` +
+            `${op.totalQuantity} уп., 💰 ${op.totalProfit.toLocaleString('uk-UA')} грн`
+          ).join('\n')
+        : '—') +
       `\n\n📋 Користувачі:`;
 
-    const buttons = users.users.map(u => [{
-      text: `${u.name} (${u.town}) — ${u.lastOrderDate || 'ніколи'}, ${u.totalOrders || 0} зам.`,
-      callback_data: `msg_${u.chatId}`
-    }]);
+    // ✅ Генерація кнопок
+    const buttons = users.users.map(u => {
+      const label = `${u.name} (${u.town}) — ${u.lastOrderDate || 'ніколи'}, ${u.totalOrders || 0} зам.`;
+      return [{ text: label, callback_data: `msg_${u.chatId}` }];
+    });
+
+    if (!Array.isArray(buttons) || !buttons.length) {
+      console.warn('⚠️ Кнопки не згенеровані:', buttons);
+      return bot.sendMessage(chatId, `⚠️ Немає користувачів для статистики.`);
+    }
 
     bot.sendMessage(chatId, header, {
       reply_markup: {
