@@ -75,24 +75,25 @@ async function reloadOrdersFromSheet() {
 async function syncUsersFromSheet() {
   try {
     const response = await axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec');
-    const rawUsers = response.data.users || [];
+    const rawUsers = response.data || []; // ✅ без .users
 
-    console.log('📦 Вміст відповіді:', response.data);
+    console.log('📦 Вміст відповіді:', rawUsers);
 
     cachedUsers = rawUsers.map(u => ({
-  chatId: String(u.chatId),
-  name: u.name || 'Невідомо',
-  username: u.username || 'невідомо',
-  town: u.town || 'Невідомо',
-  verified: true,
-  orders: []
-}));
+      chatId: String(u.chatId),
+      name: u.name || 'Невідомо',
+      username: u.username || 'невідомо',
+      town: u.town || 'Невідомо',
+      verified: true,
+      orders: []
+    }));
 
     console.log(`✅ Завантажено ${cachedUsers.length} користувачів з Google Sheets`);
   } catch (err) {
     console.error('❌ Не вдалося завантажити користувачів з таблиці:', err.message);
   }
 }
+
 
 function getMainKeyboard(chatId) {
   if (!isVerified(chatId) && !isAdmin(chatId)) return undefined;
