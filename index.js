@@ -325,15 +325,18 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   }
 });
 
-// 📊 Статистика
 bot.onText(/📊 Статистика/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAdmin(chatId)) return;
 
   try {
     const [orderRes, userRes] = await Promise.all([
-      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getStats', { action: 'getStats' }),
-      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getUserOrderStats', { action: 'getUserOrderStats' })
+      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getStats', {
+        params: { action: 'getStats' }
+      }),
+      axios.get('https://script.google.com/macros/s/AKfycbzQ5_NhWSRFFqxOlcthrAem5fshAg0fh19jRYg4ilBxANI-ZXjX_8u7jo3ot3E3EvY/exec?action=getUserOrderStats', {
+        params: { action: 'getUserOrderStats' }
+      })
     ]);
 
     const orders = orderRes.data;
@@ -343,23 +346,28 @@ bot.onText(/📊 Статистика/, async (msg) => {
       return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
     }
 
-    const header = `📊 Статистика замовлень:\n` +
-  `🔢 Всього: ${orders.total}\n` +
-  `✅ Прийнято: ${orders.accepted}\n` +
-  `❌ Скасовано: ${orders.canceled}\n` +
-  `⏳ Очікує: ${orders.pending}\n` +
-  `📦 Відправлено: ${orders.sent}\n` + // 👈 нове
-  `💳 Оплачено: ${orders.paid}\n` +    // 👈 нове
-  `💰 Заробіток: ${orders.profit.toLocaleString('uk-UA')} грн\n\n` + // 👈 нове
-  `👥 Статистика користувачів:\n` +
-  `🔢 Всього: ${users.totalUsers}\n` +
-  `📦 З замовленнями: ${users.withOrders}\n` +
-  `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
-  `📋 Користувачі:`;
-
+    const header =
+      `📊 Статистика замовлень:\n` +
+      `🔢 Всього: ${orders.total} замовлень / ${orders.totalQuantity} уп.\n` +
+      `✅ Прийнято: ${orders.accepted} / ${orders.acceptedQuantity} уп.\n` +
+      `❌ Скасовано: ${orders.canceled}\n` +
+      `⏳ Очікує: ${orders.pending}\n` +
+      `📦 Відправлено: ${orders.sent} / ${orders.sentQuantity} уп.\n` +
+      `💳 Оплачено: ${orders.paid} / ${orders.paidQuantity} уп.\n` +
+      `💰 Заробіток: ${orders.profit.toLocaleString('uk-UA')} грн\n\n` +
+      `👥 Статистика користувачів:\n` +
+      `🔢 Всього: ${users.totalUsers}\n` +
+      `📦 З замовленнями: ${users.withOrders}\n` +
+      `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
+      `🧑‍💼 Статистика по операторах:\n` +
+      users.operators.map(op =>
+        `👤 ${op.name} — 👥 ${op.totalUsers} корист., 📦 ${op.totalOrders} зам., ` +
+        `${op.totalQuantity} уп., 💰 ${op.totalProfit.toLocaleString('uk-UA')} грн`
+      ).join('\n') +
+      `\n\n📋 Користувачі:`;
 
     const buttons = users.users.map(u => [{
-      text: `${u.name} (${u.town}) — ${u.lastOrderDate}, ${u.totalAcceptedQuantity} уп.`,
+      text: `${u.name} (${u.town}) — ${u.lastOrderDate || 'ніколи'}, ${u.totalOrders || 0} зам.`,
       callback_data: `msg_${u.chatId}`
     }]);
 
@@ -373,6 +381,7 @@ bot.onText(/📊 Статистика/, async (msg) => {
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
   }
 });
+
 bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
