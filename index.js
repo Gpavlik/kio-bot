@@ -1,7 +1,7 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-
+const pendingReply = {}; // ключ — chatId адміністратора, значення — chatId користувача
 const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
@@ -569,9 +569,15 @@ if (data.startsWith('verify_')) {
   }
 
   if (data.startsWith('reply_')) {
-    const targetChatId = data.split('_')[1];
-    return bot.sendMessage(chatId, `✉️ Відповідаємо користувачу ${targetChatId}. Введіть текст:`);
-  }
+  const targetChatId = data.split('_')[1];
+  pendingReply[chatId] = targetChatId;
+
+  const summary = getCustomerSummary?.(targetChatId, users) || targetChatId;
+  await bot.sendMessage(chatId, `✍️ Введіть відповідь для користувача ${summary}`);
+  await bot.answerCallbackQuery(query.id);
+  return;
+}
+
 
 
 // ✅ Прийняти замовлення
@@ -930,14 +936,25 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
   }
 
   // 📬 Відповідь адміністратора
-  if (userIsAdmin && currentReplyTarget) {
-    bot.sendMessage(currentReplyTarget, `📬 Відповідь від оператора:\n\n${text}`);
-    bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
-    const index = pendingMessages.findIndex(m => m.chatId === currentReplyTarget);
+  if (userIsAdmin && pendingReply[chatId]) {
+  const targetChatId = pendingReply[chatId];
+
+  try {
+    await bot.sendMessage(targetChatId, `📬 Відповідь від оператора:\n\n${text}`);
+    await bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
+
+    const index = pendingMessages.findIndex(m => m.chatId === targetChatId);
     if (index !== -1) pendingMessages.splice(index, 1);
-    currentReplyTarget = null;
-    return;
+
+    delete pendingReply[chatId];
+  } catch (err) {
+    console.error('❌ Не вдалося надіслати відповідь:', err.message);
+    await bot.sendMessage(chatId, `❌ Не вдалося надіслати відповідь: ${err.message}`);
   }
+
+  return;
+}
+
 
   // ❓ Обробка запитання користувача
   if (activeOrders[chatId]?.questionMode) {
