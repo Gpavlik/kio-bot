@@ -563,13 +563,16 @@ if (data.startsWith('verify_')) {
 }
 
 // ✉️ Повідомлення користувачу
-if (data.startsWith('msg_')) {
-  const targetId = data.split('_')[1];
-  pendingMessage[chatId] = targetId;
-  await bot.sendMessage(chatId, `✍️ Введіть повідомлення для користувача ${targetId}:`);
-  await bot.answerCallbackQuery(query.id);
-  return;
-}
+  if (data.startsWith('msg_')) {
+    const targetChatId = data.split('_')[1];
+    return bot.sendMessage(chatId, `✉️ Напишіть відповідь для користувача ${targetChatId}`);
+  }
+
+  if (data.startsWith('reply_')) {
+    const targetChatId = data.split('_')[1];
+    return bot.sendMessage(chatId, `✉️ Відповідаємо користувачу ${targetChatId}. Введіть текст:`);
+  }
+
 
 // ✅ Прийняти замовлення
 if (data.startsWith('accept_')) {
@@ -707,10 +710,23 @@ if (data.startsWith('ttn_')) {
 
   await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${summary}:`);
   await bot.answerCallbackQuery(query.id);
+
+  // 🔧 Оновити клавіатуру: залишити "💳 Оплачено", якщо ще не оплачено
+  if (order?.adminMessages?.length) {
+    const updatedKeyboard = order.paymentStatus !== 'оплачено'
+      ? { inline_keyboard: [[{ text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }]] }
+      : { inline_keyboard: [] };
+
+    for (const msg of order.adminMessages) {
+      await bot.editMessageReplyMarkup(updatedKeyboard, {
+        chat_id: msg.chatId,
+        message_id: msg.messageId
+      });
+    }
+  }
+
   return;
 }
-
-
 // 💳 Позначити як оплачено
 if (data.startsWith('paid_')) {
   const [_, targetIdStr, timestampStr] = data.split('_');
@@ -734,11 +750,14 @@ if (data.startsWith('paid_')) {
       paymentStatus: 'оплачено'
     });
 
-    const updatedKeyboard = {
+    const updatedKeyboard = order.ttn
+  ? { inline_keyboard: [] }
+  : {
       inline_keyboard: [
         [{ text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }]
       ]
     };
+
 
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
@@ -928,7 +947,7 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
 
     adminChatIds.forEach(id => {
       if (!id || isNaN(id)) return;
-      bot.sendMessage(id, `❓ Запитання від @${user?.username || 'невідомо'}:\n${text}`, {
+      bot.sendMessage(id, `❓ Запитання від @${user?.name || 'невідомо'}:\n${text}`, {
         reply_markup: {
           inline_keyboard: [[{ text: '✍️ Відповісти', callback_data: `reply_${chatId}` }]]
         }
