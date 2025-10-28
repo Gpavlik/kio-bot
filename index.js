@@ -870,8 +870,8 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
   // ✉️ Надсилання повідомлення користувачу
   if (userIsAdmin && pendingMessage[chatId]) {
     const targetId = pendingMessage[chatId];
-    bot.sendMessage(targetId, `📩 Повідомлення від адміністратора:\n\n${text}`);
-    bot.sendMessage(chatId, `✅ Повідомлення надіслано.`);
+    await bot.sendMessage(targetId, `📩 Повідомлення від адміністратора:\n\n${text}`);
+    await bot.sendMessage(chatId, `✅ Повідомлення надіслано.`);
     delete pendingMessage[chatId];
     return;
   }
