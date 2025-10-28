@@ -707,22 +707,25 @@ if (data.startsWith('ttn_')) {
   const [_, targetIdStr, timestampStr] = data.split('_');
   const targetId = Number(targetIdStr);
   const timestamp = Number(timestampStr);
+  const orderId = `${targetId}_${timestamp}`;
+  const order = ordersById[orderId];
 
   pendingTTN[chatId] = { targetId, timestamp };
 
-  const orderId = `${targetId}_${timestamp}`;
-  const order = ordersById[orderId];
   const summary = getCustomerSummary(targetId, users, order);
-
-  await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${summary}:`);
+  await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${summary}`);
   await bot.answerCallbackQuery(query.id);
 
-  // 🔧 Оновити клавіатуру: залишити "💳 Оплачено", якщо ще не оплачено
-  if (order?.adminMessages?.length) {
-    const updatedKeyboard = order.paymentStatus !== 'оплачено'
-      ? { inline_keyboard: [[{ text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }]] }
-      : { inline_keyboard: [] };
+  // 🛠 Оновити клавіатуру після надсилання ТТН
+  const updatedKeyboard = order.paymentStatus !== 'оплачено'
+    ? {
+        inline_keyboard: [[
+          { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
+        ]]
+      }
+    : { inline_keyboard: [] };
 
+  if (order.adminMessages?.length) {
     for (const msg of order.adminMessages) {
       await bot.editMessageReplyMarkup(updatedKeyboard, {
         chat_id: msg.chatId,
@@ -733,6 +736,7 @@ if (data.startsWith('ttn_')) {
 
   return;
 }
+
 // 💳 Позначити як оплачено
 if (data.startsWith('paid_')) {
   const [_, targetIdStr, timestampStr] = data.split('_');
