@@ -947,8 +947,11 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
   const targetChatId = pendingReply[chatId];
 
   try {
-    await bot.sendMessage(targetChatId, `📬 Відповідь від оператора:\n\n${text}`);
+    await bot.sendMessage(targetChatId, `📩 Відповідь від оператора:\n\n${text}`);
     await bot.sendMessage(chatId, `✅ Відповідь надіслано.`);
+
+    // ❌ НЕ ТРЕБА: editMessageReplyMarkup({ inline_keyboard: [] })
+    // ❌ НЕ ТРЕБА: reply_markup: {} в sendMessage
 
     const index = pendingMessages.findIndex(m => m.chatId === targetChatId);
     if (index !== -1) pendingMessages.splice(index, 1);
@@ -961,6 +964,7 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
 
   return;
 }
+
 
 
   // ❓ Обробка запитання користувача
