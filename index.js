@@ -579,10 +579,15 @@ if (data.startsWith('verify_')) {
 }
 
 // ✉️ Повідомлення користувачу
-  if (data.startsWith('msg_')) {
-    const targetChatId = data.split('_')[1];
-    return bot.sendMessage(chatId, `✉️ Напишіть відповідь для користувача ${targetChatId}`);
-  }
+if (data.startsWith('msg_')) {
+  const targetChatId = Number(data.split('_')[1]);
+  pendingMessage[chatId] = targetChatId;
+
+  await bot.sendMessage(chatId, `✉️ Напишіть відповідь для користувача ${targetChatId}`);
+  await bot.answerCallbackQuery(query.id);
+  return;
+}
+// ✍️ Відповідь користувачу
 
   if (data.startsWith('reply_')) {
   const targetChatId = data.split('_')[1];
@@ -868,13 +873,20 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
   }
 
   // ✉️ Надсилання повідомлення користувачу
-  if (userIsAdmin && pendingMessage[chatId]) {
-    const targetId = pendingMessage[chatId];
+if (userIsAdmin && pendingMessage[chatId]) {
+  const targetId = pendingMessage[chatId];
+
+  try {
     await bot.sendMessage(targetId, `📩 Повідомлення від адміністратора:\n\n${text}`);
     await bot.sendMessage(chatId, `✅ Повідомлення надіслано.`);
-    delete pendingMessage[chatId];
-    return;
+  } catch (err) {
+    console.error('❌ Не вдалося надіслати повідомлення:', err.message);
+    await bot.sendMessage(chatId, `❌ Не вдалося надіслати повідомлення: ${err.message}`);
   }
+
+  delete pendingMessage[chatId];
+  return;
+}
 
   // 🔐 Верифікація — покрокова
   if (!isUserVerified && verificationRequests[chatId]) {
