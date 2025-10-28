@@ -21,6 +21,20 @@ let currentReplyTarget = null;
 const lastSent = {};
 let cachedUsers = [];
 
+function getOrderKeyboard(order) {
+  const buttons = [];
+
+  if (order.paymentStatus !== 'оплачено') {
+    buttons.push({ text: '💳 Оплачено', callback_data: `paid_${order.chatId}_${order.timestamp}` });
+  }
+
+  if (!order.ttn) {
+    buttons.push({ text: '📦 Надіслати ТТН', callback_data: `ttn_${order.chatId}_${order.timestamp}` });
+  }
+
+  return { inline_keyboard: buttons.map(btn => [btn]) }; // кожна кнопка в окремому рядку
+}
+
 function isAdmin(chatId) {
   return adminChatIds.includes(Number(chatId));
 }
@@ -717,9 +731,8 @@ if (data.startsWith('ttn_')) {
   await bot.answerCallbackQuery(query.id);
 
   // 🛠 Оновити клавіатуру: залишити кнопку "💳 Оплачено", якщо ще не оплачено
-  const updatedKeyboard = {
-    inline_keyboard: []
-  };
+  const updatedKeyboard = getOrderKeyboard(order);
+
 
   if (order.paymentStatus !== 'оплачено') {
     updatedKeyboard.inline_keyboard.push([
@@ -763,9 +776,8 @@ if (data.startsWith('paid_')) {
     });
 
     // 🛠 Оновити клавіатуру: залишити "📦 Надіслати ТТН", якщо ТТН ще не введено
-    const updatedKeyboard = {
-      inline_keyboard: []
-    };
+    const updatedKeyboard = getOrderKeyboard(order);
+
 
     if (!order.ttn) {
       updatedKeyboard.inline_keyboard.push([
