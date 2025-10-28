@@ -716,7 +716,7 @@ if (data.startsWith('ttn_')) {
   await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${summary}`);
   await bot.answerCallbackQuery(query.id);
 
-  // 🛠 Оновити клавіатуру після надсилання ТТН
+  // 🛠 Оновити клавіатуру: залишити кнопку "💳 Оплачено", якщо ще не оплачено
   const updatedKeyboard = order.paymentStatus !== 'оплачено'
     ? {
         inline_keyboard: [[
@@ -736,6 +736,7 @@ if (data.startsWith('ttn_')) {
 
   return;
 }
+
 
 // 💳 Позначити як оплачено
 if (data.startsWith('paid_')) {
@@ -760,14 +761,14 @@ if (data.startsWith('paid_')) {
       paymentStatus: 'оплачено'
     });
 
+    // 🛠 Оновити клавіатуру: залишити "📦 Надіслати ТТН", якщо ТТН ще не введено
     const updatedKeyboard = order.ttn
-  ? { inline_keyboard: [] }
-  : {
-      inline_keyboard: [
-        [{ text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }]
-      ]
-    };
-
+      ? { inline_keyboard: [] }
+      : {
+          inline_keyboard: [[
+            { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
+          ]]
+        };
 
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
@@ -786,8 +787,10 @@ if (data.startsWith('paid_')) {
     console.error('❌ Помилка оновлення статусу:', err.message);
     await bot.sendMessage(chatId, `❌ Помилка оновлення статусу: ${err.message}`);
   }
+
   return;
 }
+
 
 
 // ❓ Невідома дія
