@@ -726,26 +726,41 @@ if (data.startsWith('ttn_')) {
   const orderId = `${targetId}_${timestamp}`;
   const order = ordersById[orderId];
 
+  if (!order) {
+    await bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
+    return;
+  }
+
+  // 🔍 Перевірка: чи вже є ТТН
+  if (order.ttn) {
+    await bot.sendMessage(chatId, `✅ ТТН вже введено: ${order.ttn}`);
+    return;
+  }
+
   pendingTTN[chatId] = { targetId, timestamp };
 
   const summary = getCustomerSummary(targetId, users, order);
   await bot.sendMessage(chatId, `✍️ Введіть номер ТТН для користувача ${summary}`);
   await bot.answerCallbackQuery(query.id);
 
-  // 🛠 Оновити клавіатуру: залишити кнопку "💳 Оплачено", якщо ще не оплачено
   const updatedKeyboard = getOrderKeyboard(order);
 
-  if (order.adminMessages?.length) {
-    for (const msg of order.adminMessages) {
+  for (const msg of order.adminMessages || []) {
+    try {
       await bot.editMessageReplyMarkup(updatedKeyboard, {
         chat_id: msg.chatId,
         message_id: msg.messageId
       });
+    } catch (err) {
+      if (!err.message.includes('message is not modified')) {
+        console.error('❌ Помилка оновлення клавіатури:', err.message);
+      }
     }
   }
 
   return;
 }
+
 
 // 💳 Позначити як оплачено
 if (data.startsWith('paid_')) {
@@ -757,6 +772,12 @@ if (data.startsWith('paid_')) {
 
   if (!order) {
     await bot.sendMessage(chatId, `❌ Замовлення не знайдено: ${orderId}`);
+    return;
+  }
+
+  // 🔍 Перевірка: чи вже оплачено
+  if (order.paymentStatus === 'оплачено') {
+    await bot.sendMessage(chatId, `✅ Статус вже оновлено: *оплачено*`, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -775,10 +796,16 @@ if (data.startsWith('paid_')) {
     const updatedKeyboard = getOrderKeyboard(order);
 
     for (const msg of order.adminMessages || []) {
-      await bot.editMessageReplyMarkup(updatedKeyboard, {
-        chat_id: msg.chatId,
-        message_id: msg.messageId
-      });
+      try {
+        await bot.editMessageReplyMarkup(updatedKeyboard, {
+          chat_id: msg.chatId,
+          message_id: msg.messageId
+        });
+      } catch (err) {
+        if (!err.message.includes('message is not modified')) {
+          console.error('❌ Помилка оновлення клавіатури:', err.message);
+        }
+      }
     }
 
     const summary = getCustomerSummary(targetId, users, order);
@@ -792,7 +819,6 @@ if (data.startsWith('paid_')) {
 
   return;
 }
-
 
 // ❓ Невідома дія
 await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' });
