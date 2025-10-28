@@ -24,16 +24,29 @@ let cachedUsers = [];
 function getOrderKeyboard(order) {
   const buttons = [];
 
+  const paidCallback = `paid_${order.chatId}_${order.timestamp}`;
+  const ttnCallback = `ttn_${order.chatId}_${order.timestamp}`;
+
+  // Уникнути дублювання
+  const existingCallbacks = new Set();
+
   if (order.paymentStatus !== 'оплачено') {
-    buttons.push({ text: '💳 Оплачено', callback_data: `paid_${order.chatId}_${order.timestamp}` });
+    if (!existingCallbacks.has(paidCallback)) {
+      buttons.push({ text: '💳 Оплачено', callback_data: paidCallback });
+      existingCallbacks.add(paidCallback);
+    }
   }
 
   if (!order.ttn) {
-    buttons.push({ text: '📦 Надіслати ТТН', callback_data: `ttn_${order.chatId}_${order.timestamp}` });
+    if (!existingCallbacks.has(ttnCallback)) {
+      buttons.push({ text: '📦 Надіслати ТТН', callback_data: ttnCallback });
+      existingCallbacks.add(ttnCallback);
+    }
   }
 
-  return { inline_keyboard: buttons.map(btn => [btn]) }; // кожна кнопка в окремому рядку
+  return { inline_keyboard: buttons.map(btn => [btn]) };
 }
+
 
 function isAdmin(chatId) {
   return adminChatIds.includes(Number(chatId));
@@ -1005,30 +1018,36 @@ if (userIsAdmin && pendingTTN[chatId]) {
 
   const order = ordersById[orderId];
   if (!order) {
-    bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
+    await bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
     delete pendingTTN[chatId];
     return;
   }
 
+  // 🧠 Зберігаємо ТТН і статус
   order.ttn = text;
   order.status = 'відправлено';
 
+  // 💰 Розрахунок суми
   const unitPrice = 8500;
   const amount = order.quantity * unitPrice;
   const userRecord = cachedUsers.find(u => String(u.chatId) === String(targetId));
   const verifiedName = userRecord?.name || 'Користувач';
-    
+
+  // 📩 Повідомлення для користувача
   const userMessage =
-  `Шановний(а) ${verifiedName}, ваше замовлення для ${order.name} підтверджено та вже відправилось в дорогу:\n\n` +
-  `📦 Ваше замовлення:\n` +
-  `• Кількість: ${order.quantity} уп.\n` +
-  `• Місто: ${order.city}\n` +
-  `• Сума: ${amount.toLocaleString('uk-UA')} грн\n` +
-  `• ТТН: ${text}\n\n` +
-  `Дякуємо за замовлення! Сподіваємось на подальшу співпрацю`;
+    `Шановний(а) ${verifiedName}, ваше замовлення для ${order.name} підтверджено та вже відправилось в дорогу:\n\n` +
+    `📦 Ваше замовлення:\n` +
+    `• Кількість: ${order.quantity} уп.\n` +
+    `• Місто: ${order.city}\n` +
+    `• Сума: ${amount.toLocaleString('uk-UA')} грн\n` +
+    `• ТТН: ${text}\n\n` +
+    `Дякуємо за замовлення! Сподіваємось на подальшу співпрацю`;
+
+  // 📩 Повідомлення для оператора
   const adminMessage = `📤 ТТН на замовлення ${verifiedName} для ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
+    // 🔄 Оновлення в Google Sheets
     await axios.post('https://script.google.com/macros/s/AKfycbx9VpoHx_suctQ-8yKVHvRBuSWvjvGEzQ9SXDZK7yJP1RBS2KOp3m8xXxIEttTKetTr/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
@@ -1037,28 +1056,35 @@ if (userIsAdmin && pendingTTN[chatId]) {
       status: 'відправлено'
     });
 
+    // 📤 Надсилання повідомлень
     await bot.sendMessage(targetId, userMessage);
     await bot.sendMessage(chatId, adminMessage);
 
-    // 🧩 Синхронне оновлення клавіатури у всіх адмінів
-    if (order.adminMessages && Array.isArray(order.adminMessages)) {
-      for (const msg of order.adminMessages) {
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-          chat_id: msg.chatId,
-          message_id: msg.messageId
-        });
-      }
+    // 🧩 Оновлення клавіатури: залишити "💳 Оплачено", якщо ще не оплачено
+    const updatedKeyboard = {
+      inline_keyboard: []
+    };
+
+    if (order.paymentStatus !== 'оплачено') {
+      updatedKeyboard.inline_keyboard.push([
+        { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
+      ]);
+    }
+
+    for (const msg of order.adminMessages || []) {
+      await bot.editMessageReplyMarkup(updatedKeyboard, {
+        chat_id: msg.chatId,
+        message_id: msg.messageId
+      });
     }
   } catch (err) {
     console.error('❌ Помилка надсилання ТТН:', err.message);
-    bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
+    await bot.sendMessage(chatId, `⚠️ Не вдалося надіслати ТТН: ${err.message}`);
   }
 
   delete pendingTTN[chatId];
   return;
 }
-
-
 
   // 🛒 Початок замовлення
 if (text === '🛒 Зробити замовлення') {
