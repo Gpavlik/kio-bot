@@ -24,28 +24,17 @@ let cachedUsers = [];
 function getOrderKeyboard(order) {
   const buttons = [];
 
-  const paidCallback = `paid_${order.chatId}_${order.timestamp}`;
-  const ttnCallback = `ttn_${order.chatId}_${order.timestamp}`;
-
-  // Уникнути дублювання
-  const existingCallbacks = new Set();
-
   if (order.paymentStatus !== 'оплачено') {
-    if (!existingCallbacks.has(paidCallback)) {
-      buttons.push({ text: '💳 Оплачено', callback_data: paidCallback });
-      existingCallbacks.add(paidCallback);
-    }
+    buttons.push({ text: '💳 Оплачено', callback_data: `paid_${order.chatId}_${order.timestamp}` });
   }
 
   if (!order.ttn) {
-    if (!existingCallbacks.has(ttnCallback)) {
-      buttons.push({ text: '📦 Надіслати ТТН', callback_data: ttnCallback });
-      existingCallbacks.add(ttnCallback);
-    }
+    buttons.push({ text: '📦 Надіслати ТТН', callback_data: `ttn_${order.chatId}_${order.timestamp}` });
   }
 
   return { inline_keyboard: buttons.map(btn => [btn]) };
 }
+
 
 
 function isAdmin(chatId) {
@@ -746,13 +735,6 @@ if (data.startsWith('ttn_')) {
   // 🛠 Оновити клавіатуру: залишити кнопку "💳 Оплачено", якщо ще не оплачено
   const updatedKeyboard = getOrderKeyboard(order);
 
-
-  if (order.paymentStatus !== 'оплачено') {
-    updatedKeyboard.inline_keyboard.push([
-      { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
-    ]);
-  }
-
   if (order.adminMessages?.length) {
     for (const msg of order.adminMessages) {
       await bot.editMessageReplyMarkup(updatedKeyboard, {
@@ -779,6 +761,8 @@ if (data.startsWith('paid_')) {
   }
 
   order.paymentStatus = 'оплачено';
+  order.chatId = targetId;
+  order.timestamp = timestamp;
 
   try {
     await axios.post(SCRIPT_URL, {
@@ -788,23 +772,13 @@ if (data.startsWith('paid_')) {
       paymentStatus: 'оплачено'
     });
 
-    // 🛠 Оновити клавіатуру: залишити "📦 Надіслати ТТН", якщо ТТН ще не введено
     const updatedKeyboard = getOrderKeyboard(order);
 
-
-    if (!order.ttn) {
-      updatedKeyboard.inline_keyboard.push([
-        { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
-      ]);
-    }
-
-    if (order.adminMessages?.length) {
-      for (const msg of order.adminMessages) {
-        await bot.editMessageReplyMarkup(updatedKeyboard, {
-          chat_id: msg.chatId,
-          message_id: msg.messageId
-        });
-      }
+    for (const msg of order.adminMessages || []) {
+      await bot.editMessageReplyMarkup(updatedKeyboard, {
+        chat_id: msg.chatId,
+        message_id: msg.messageId
+      });
     }
 
     const summary = getCustomerSummary(targetId, users, order);
@@ -818,6 +792,7 @@ if (data.startsWith('paid_')) {
 
   return;
 }
+
 
 // ❓ Невідома дія
 await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' });
@@ -1014,26 +989,24 @@ if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId
 if (userIsAdmin && pendingTTN[chatId]) {
   const { targetId, timestamp } = pendingTTN[chatId];
   const orderId = `${targetId}_${timestamp}`;
-  console.log('🔍 Шукаємо orderId:', orderId);
-
   const order = ordersById[orderId];
+
   if (!order) {
     await bot.sendMessage(chatId, `❌ Замовлення не знайдено.`);
     delete pendingTTN[chatId];
     return;
   }
 
-  // 🧠 Зберігаємо ТТН і статус
   order.ttn = text;
   order.status = 'відправлено';
+  order.chatId = targetId;
+  order.timestamp = timestamp;
 
-  // 💰 Розрахунок суми
   const unitPrice = 8500;
   const amount = order.quantity * unitPrice;
   const userRecord = cachedUsers.find(u => String(u.chatId) === String(targetId));
   const verifiedName = userRecord?.name || 'Користувач';
 
-  // 📩 Повідомлення для користувача
   const userMessage =
     `Шановний(а) ${verifiedName}, ваше замовлення для ${order.name} підтверджено та вже відправилось в дорогу:\n\n` +
     `📦 Ваше замовлення:\n` +
@@ -1043,11 +1016,9 @@ if (userIsAdmin && pendingTTN[chatId]) {
     `• ТТН: ${text}\n\n` +
     `Дякуємо за замовлення! Сподіваємось на подальшу співпрацю`;
 
-  // 📩 Повідомлення для оператора
   const adminMessage = `📤 ТТН на замовлення ${verifiedName} для ${order.name} ${order.date} ${order.time} відправлено`;
 
   try {
-    // 🔄 Оновлення в Google Sheets
     await axios.post('https://script.google.com/macros/s/AKfycbx9VpoHx_suctQ-8yKVHvRBuSWvjvGEzQ9SXDZK7yJP1RBS2KOp3m8xXxIEttTKetTr/exec', {
       action: 'updateTTN',
       timestamp: order.timestamp,
@@ -1056,20 +1027,10 @@ if (userIsAdmin && pendingTTN[chatId]) {
       status: 'відправлено'
     });
 
-    // 📤 Надсилання повідомлень
     await bot.sendMessage(targetId, userMessage);
     await bot.sendMessage(chatId, adminMessage);
 
-    // 🧩 Оновлення клавіатури: залишити "💳 Оплачено", якщо ще не оплачено
-    const updatedKeyboard = {
-      inline_keyboard: []
-    };
-
-    if (order.paymentStatus !== 'оплачено') {
-      updatedKeyboard.inline_keyboard.push([
-        { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
-      ]);
-    }
+    const updatedKeyboard = getOrderKeyboard(order);
 
     for (const msg of order.adminMessages || []) {
       await bot.editMessageReplyMarkup(updatedKeyboard, {
@@ -1085,6 +1046,7 @@ if (userIsAdmin && pendingTTN[chatId]) {
   delete pendingTTN[chatId];
   return;
 }
+
 
   // 🛒 Початок замовлення
 if (text === '🛒 Зробити замовлення') {
