@@ -717,13 +717,15 @@ if (data.startsWith('ttn_')) {
   await bot.answerCallbackQuery(query.id);
 
   // 🛠 Оновити клавіатуру: залишити кнопку "💳 Оплачено", якщо ще не оплачено
-  const updatedKeyboard = order.paymentStatus !== 'оплачено'
-    ? {
-        inline_keyboard: [[
-          { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
-        ]]
-      }
-    : { inline_keyboard: [] };
+  const updatedKeyboard = {
+    inline_keyboard: []
+  };
+
+  if (order.paymentStatus !== 'оплачено') {
+    updatedKeyboard.inline_keyboard.push([
+      { text: '💳 Оплачено', callback_data: `paid_${targetId}_${timestamp}` }
+    ]);
+  }
 
   if (order.adminMessages?.length) {
     for (const msg of order.adminMessages) {
@@ -736,7 +738,6 @@ if (data.startsWith('ttn_')) {
 
   return;
 }
-
 
 // 💳 Позначити як оплачено
 if (data.startsWith('paid_')) {
@@ -762,13 +763,15 @@ if (data.startsWith('paid_')) {
     });
 
     // 🛠 Оновити клавіатуру: залишити "📦 Надіслати ТТН", якщо ТТН ще не введено
-    const updatedKeyboard = order.ttn
-      ? { inline_keyboard: [] }
-      : {
-          inline_keyboard: [[
-            { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
-          ]]
-        };
+    const updatedKeyboard = {
+      inline_keyboard: []
+    };
+
+    if (!order.ttn) {
+      updatedKeyboard.inline_keyboard.push([
+        { text: '📦 Надіслати ТТН', callback_data: `ttn_${targetId}_${timestamp}` }
+      ]);
+    }
 
     if (order.adminMessages?.length) {
       for (const msg of order.adminMessages) {
@@ -790,8 +793,6 @@ if (data.startsWith('paid_')) {
 
   return;
 }
-
-
 
 // ❓ Невідома дія
 await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' });
