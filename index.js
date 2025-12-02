@@ -837,26 +837,19 @@ await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' }
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text || '';
+  const text = msg.text; // не даємо дефолт '', щоб можна було відрізнити undefined
   const { first_name, username } = msg.from || {};
   const userIsAdmin = isAdmin(chatId);
   const isUserVerified = isVerified(chatId);
   const user = cachedUsers.find(u => String(u.chatId) === String(chatId)) || {};
 
-  if (text === '/adminpanel') return;
+if (text === '/adminpanel') return;
 
   console.log(`📩 Повідомлення від ${chatId} (@${username}) | isAdmin=${userIsAdmin} | isVerified=${isUserVerified} | text="${text}"`);
-  // 🔹 Перевіряємо, чи є текст
-  if (typeof text === 'string') {
-    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
-      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
-      shownMenuOnce.add(chatId);
-      return;
-    }
 
-    // 🔹 Захист від undefined
+  // 🔹 Якщо є текст
   if (typeof text === 'string') {
-    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+    if (!text.startsWith('/') && isUserVerified && !shownMenuOnce.has(chatId)) {
       await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
       shownMenuOnce.add(chatId);
       return;
@@ -872,11 +865,24 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // інші обробки текстових повідомлень...
+    if (text === '/start') {
+      if (isUserVerified) {
+        bot.sendMessage(chatId, `👋 Ви вже верифіковані.`, getMainKeyboard(chatId));
+      } else {
+        verificationRequests[chatId] = {
+          step: 1,
+          createdAt: Date.now(),
+          username: username || 'невідомо',
+          name: first_name || 'Невідомо'
+        };
+        bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
+      }
+      return;
+    }
   } else {
     // 🔹 Якщо повідомлення не текстове — просто логуємо
     console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
-  }
+  
   }
 
   // Якщо це не команда (типу /start) і користувач верифікований
