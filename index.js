@@ -1008,15 +1008,23 @@ await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано,
 
 // 📢 Режим розсилки
 if (userIsAdmin && broadcastMode) {
+  // Фото
   if (msg.photo) {
     const fileId = msg.photo[msg.photo.length - 1].file_id;
     const file = await bot.getFile(fileId);
     const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
     broadcastPayload.photoPath = fileUrl;
-    await bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
+
+    // ✅ якщо є caption — зберігаємо як текст
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.text = msg.caption;
+    }
+
+    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
     return;
   }
 
+  // Текст без фото
   if (!broadcastPayload.text && typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
     broadcastPayload.text = text;
     await bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
