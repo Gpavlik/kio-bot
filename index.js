@@ -419,16 +419,29 @@ bot.onText(/📊 Статистика/, async (msg) => {
 });
 
 bot.on('callback_query', async (query) => {
-  const chatId = query.message?.chat?.id;
-  const data = query.data;
-  if (!chatId || !data) {
-    console.warn('⚠️ callback_query без chatId або data');
-    return;
-  }
+  try {
+    const chatId = query.message?.chat?.id || query.from?.id; // ✅ fallback
+    const data = query.data;
 
-  console.log('📥 Отримано callback_query:', data);
+    if (!chatId) {
+      console.warn('⚠️ callback_query без chatId:', query);
+      if (query.id) {
+        await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка: немає chatId', show_alert: true });
+      }
+      return;
+    }
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx9VpoHx_suctQ-8yKVHvRBuSWvjvGEzQ9SXDZK7yJP1RBS2KOp3m8xXxIEttTKetTr/exec';
+    if (!data) {
+      console.warn('⚠️ callback_query без data:', query);
+      if (query.id) {
+        await bot.answerCallbackQuery(query.id, { text: '⚠️ Помилка: немає даних', show_alert: true });
+      }
+      return;
+    }
+
+    console.log('📥 Отримано callback_query:', { chatId, data });
+
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx9VpoHx_suctQ-8yKVHvRBuSWvjvGEzQ9SXDZK7yJP1RBS2KOp3m8xXxIEttTKetTr/exec';
 
   // 💰 Оплата
   if (data === 'payment_cod' || data === 'payment_prepaid') {
@@ -833,6 +846,12 @@ if (typeof data === 'string' && data.startsWith('cancel_')) {
 }
 // ❓ Невідома дія
 await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' });
+  } catch (err) {
+    console.error('❌ Помилка у callback_query:', err.message, err.stack);
+    if (query.id) {
+      await bot.answerCallbackQuery(query.id, { text: '⚠️ Внутрішня помилка', show_alert: true });
+    }
+  }
 });
 
 bot.on('message', async (msg) => {
