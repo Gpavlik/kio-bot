@@ -25,6 +25,7 @@ const pendingTTN = {};
 let currentReplyTarget = null;
 const lastSent = {};
 let cachedUsers = [];
+await bot.getUpdates({ offset: -1 });
 
 function getOrderKeyboard(order) {
   const buttons = [];
