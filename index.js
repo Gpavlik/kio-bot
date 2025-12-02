@@ -265,12 +265,11 @@ bot.onText(/\/broadcast/, (msg) => {
 
   bot.sendMessage(msg.chat.id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
 });
-
 // 🚀 Відправка розсилки
 bot.onText(/\/sendbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
-  const { text: broadcastText, photoPath } = broadcastPayload;
+  const { text: broadcastText, photoPath } = broadcastPayload; // ✅ уникаємо конфлікту
   if (!broadcastText) {
     await bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення.`);
     return;
@@ -278,6 +277,8 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   let success = 0;
   let failed = 0;
+
+  console.log('🚀 Запуск розсилки:', broadcastPayload, 'користувачів:', cachedUsers.length);
 
   for (const user of cachedUsers) {
     const id = Number(user.chatId);
@@ -289,9 +290,10 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
       } else {
         await bot.sendMessage(id, `📢 ${broadcastText}`);
       }
+      console.log(`➡️ Надіслано користувачу ${id}`);
       success++;
     } catch (err) {
-      console.error(`❌ Не вдалося надіслати ${id}:`, err.message);
+      console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
       failed++;
     }
 
@@ -302,9 +304,6 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   broadcastPayload = { text: null, photoPath: null };
   broadcastMode = false;
 });
-
-
-
 // 🧭 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
@@ -1007,33 +1006,31 @@ if (msg.contact) {
 // 🔹 Якщо нічого з вище
 await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
 
-// 📢 Режим розсилки
-if (userIsAdmin && broadcastMode) {
-  // Фото
-  if (msg.photo) {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-    broadcastPayload.photoPath = fileUrl;
+ if (isAdmin(chatId) && broadcastMode) {
+    // Фото
+    if (msg.photo) {
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      const file = await bot.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+      broadcastPayload.photoPath = fileUrl;
 
-    // ✅ якщо є caption — зберігаємо як текст
-    if (msg.caption && msg.caption.trim() !== '') {
-      broadcastPayload.text = msg.caption;
+      // ✅ якщо є caption — зберігаємо як текст
+      if (msg.caption && msg.caption.trim() !== '') {
+        broadcastPayload.text = msg.caption;
+      }
+
+      await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+      return;
     }
 
-    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-    return;
+    // Текст без фото
+    if (!broadcastPayload.text && text.trim() !== '' && !text.startsWith('/')) {
+      broadcastPayload.text = text;
+      await bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+      return;
+    }
   }
 
-  // Текст без фото
-  if (!broadcastPayload.text && typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
-    broadcastPayload.text = text;
-    await bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
-    return;
-  }
-
-  return;
-}
 
 
 // ❓ Задати запитання
