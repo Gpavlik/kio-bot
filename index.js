@@ -13,6 +13,7 @@ async function startBot() {
   } catch (err) {
     console.error('❌ Помилка очищення апдейтів:', err.message);
   }
+if (msg.date * 1000 < Date.now() - 60_000) return; // ігноруємо старші за 1 хв
 
   await reloadOrdersFromSheet();
   await syncUsersFromSheet();
