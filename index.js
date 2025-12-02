@@ -1034,6 +1034,7 @@ if (userIsAdmin && broadcastMode) {
   return;
 }
 
+
 // ❓ Задати запитання
 if (text === '❓ Задати запитання') {
   await bot.sendMessage(chatId, `✍️ Напишіть своє запитання, і оператор відповість найближчим часом.`);
