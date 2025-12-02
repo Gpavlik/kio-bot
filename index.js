@@ -5,7 +5,13 @@ const pendingReply = {}; // ключ — chatId адміністратора, з
 const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
+require('dotenv').config();
+const axios = require('axios');
+const initBot = require('./initBot');
 
+(async () => {
+  const bot = await initBot(reloadOrdersFromSheet, syncUsersFromSheet);
+})();
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
   .map(id => Number(id.trim()))
