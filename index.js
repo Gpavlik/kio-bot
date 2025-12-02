@@ -5,7 +5,20 @@ const pendingReply = {}; // ключ — chatId адміністратора, з
 const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
+async function startBot() {
+  // 🔹 Очистка черги апдейтів
+  try {
+    await bot.getUpdates({ offset: -1 });
+    console.log('🧹 Черга апдейтів очищена');
+  } catch (err) {
+    console.error('❌ Помилка очищення апдейтів:', err.message);
+  }
 
+  await reloadOrdersFromSheet();
+  await syncUsersFromSheet();
+
+  console.log('🚀 Бот запущено і кеш оновлено');
+}
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
   .map(id => Number(id.trim()))
