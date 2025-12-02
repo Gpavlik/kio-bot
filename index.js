@@ -958,6 +958,24 @@ if (userIsAdmin && pendingMessage[chatId]) {
     hasSticker: !!msg.sticker,
     hasContact: !!msg.contact
   });
+  // Захист від undefined
+  if (typeof text === 'string') {
+    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
+      shownMenuOnce.add(chatId);
+      return;
+    }
+
+    if (text === '🔙 Назад до користувацького меню') {
+      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+      return;
+    }
+
+    // інші обробки текстових повідомлень...
+  } else {
+    // Якщо повідомлення не текстове
+    console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
+  }
 
   // 🔹 Якщо є текст
   if (typeof text === 'string') {
