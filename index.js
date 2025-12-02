@@ -270,9 +270,9 @@ bot.onText(/\/broadcast/, (msg) => {
 bot.onText(/\/sendbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
-  const { text, photoPath } = broadcastPayload;
-  if (!text) {
-    bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення.`);
+  const { text: broadcastText, photoPath } = broadcastPayload;
+  if (!broadcastText) {
+    await bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення.`);
     return;
   }
 
@@ -285,9 +285,9 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
     try {
       if (photoPath) {
-        await bot.sendPhoto(id, photoPath, { caption: text });
+        await bot.sendPhoto(id, photoPath, { caption: broadcastText });
       } else {
-        await bot.sendMessage(id, `📢 ${text}`);
+        await bot.sendMessage(id, `📢 ${broadcastText}`);
       }
       success++;
     } catch (err) {
@@ -298,10 +298,11 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
     await new Promise(res => setTimeout(res, 1000)); // throttle 1 сек
   }
 
-  bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
+  await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photoPath: null };
   broadcastMode = false;
 });
+
 
 
 // 🧭 Панель оператора
