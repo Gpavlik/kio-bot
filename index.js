@@ -840,7 +840,29 @@ bot.on('message', async (msg) => {
   if (text === '/adminpanel') return;
 
   console.log(`📩 Повідомлення від ${chatId} (@${username}) | isAdmin=${userIsAdmin} | isVerified=${isUserVerified} | text="${text}"`);
+  // 🔹 Перевіряємо, чи є текст
+  if (typeof text === 'string') {
+    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
+      shownMenuOnce.add(chatId);
+      return;
+    }
 
+    if (text === '🔙 Назад до користувацького меню') {
+      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+      return;
+    }
+
+    if (text === '📊 Статистика') {
+      await bot.sendMessage(chatId, `📊 Ось ваша статистика...`);
+      return;
+    }
+
+    // інші обробки текстових повідомлень...
+  } else {
+    // 🔹 Якщо повідомлення не текстове — просто ігноруємо або обробляємо окремо
+    console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
+  }
 
   // Якщо це не команда (типу /start) і користувач верифікований
 if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
