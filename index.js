@@ -6,7 +6,6 @@ const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 require('dotenv').config();
-const axios = require('axios');
 const initBot = require('./initBot');
 
 (async () => {
