@@ -948,6 +948,69 @@ if (userIsAdmin && pendingMessage[chatId]) {
   }
 
   // 📢 Режим розсилки
+
+  // Логування для діагностики
+  console.log('📥 Отримано повідомлення:', {
+    chatId,
+    text,
+    hasPhoto: !!msg.photo,
+    hasDocument: !!msg.document,
+    hasSticker: !!msg.sticker,
+    hasContact: !!msg.contact
+  });
+
+  // 🔹 Якщо є текст
+  if (typeof text === 'string') {
+    // Приклад: кнопка "Назад"
+    if (text === '🔙 Назад до користувацького меню') {
+      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+      return;
+    }
+
+    // Приклад: команди
+    if (text.startsWith('/')) {
+      // тут обробка команд
+      return;
+    }
+
+    // Приклад: звичайний текст користувача
+    if (isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
+      shownMenuOnce.add(chatId);
+      return;
+    }
+  }
+
+  // 🔹 Якщо прийшло фото
+  if (msg.photo) {
+    await bot.sendMessage(chatId, '🖼 Ви надіслали фото. Дякуємо!');
+    return;
+  }
+
+  // 🔹 Якщо прийшов документ
+  if (msg.document) {
+    await bot.sendMessage(chatId, '📄 Ви надіслали документ. Дякуємо!');
+    return;
+  }
+
+  // 🔹 Якщо прийшов стікер
+  if (msg.sticker) {
+    await bot.sendMessage(chatId, '😄 Гарний стікер!');
+    return;
+  }
+
+  // 🔹 Якщо прийшов контакт
+  if (msg.contact) {
+    await bot.sendMessage(chatId, `📞 Контакт отримано: ${msg.contact.phone_number}`);
+    return;
+  }
+
+  // 🔹 Якщо нічого з вище
+  await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
+
+
+
+
   if (userIsAdmin && broadcastMode) {
     if (msg.photo) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
