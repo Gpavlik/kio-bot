@@ -1,10 +1,10 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-
 const pendingReply = {}; // ключ — chatId адміністратора, значення — chatId користувача
 const shownMenuOnce = new Set();
 const token = process.env.BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
 
 const adminChatIds = (process.env.ADMIN_CHAT_IDS || '')
   .split(',')
@@ -21,23 +21,6 @@ let currentReplyTarget = null;
 const lastSent = {};
 let cachedUsers = [];
 
-async function main() {
-  const bot = new TelegramBot(token, { polling: true });
-
-  // 🔹 Оновлюємо кеш
-  await reloadOrdersFromSheet();
-  await syncUsersFromSheet();
-
-  // 🔹 Очищаємо чергу апдейтів
-  try {
-    await bot.getUpdates({ offset: -1 });
-    console.log('🧹 Черга апдейтів очищена');
-  } catch (err) {
-    console.error('❌ Помилка очищення апдейтів:', err.message);
-  }
-
-  console.log('🚀 Бот запущено і кеш оновлено');
-}
 function getOrderKeyboard(order) {
   const buttons = [];
 
@@ -848,53 +831,16 @@ await bot.answerCallbackQuery(query.id, { text: '❓ Невідома дія.' }
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text; // не даємо дефолт '', щоб можна було відрізнити undefined
+  const text = msg.text || '';
   const { first_name, username } = msg.from || {};
   const userIsAdmin = isAdmin(chatId);
   const isUserVerified = isVerified(chatId);
   const user = cachedUsers.find(u => String(u.chatId) === String(chatId)) || {};
 
-if (text === '/adminpanel') return;
+  if (text === '/adminpanel') return;
 
   console.log(`📩 Повідомлення від ${chatId} (@${username}) | isAdmin=${userIsAdmin} | isVerified=${isUserVerified} | text="${text}"`);
 
-  // 🔹 Якщо є текст
-  if (typeof text === 'string') {
-    if (!text.startsWith('/') && isUserVerified && !shownMenuOnce.has(chatId)) {
-      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
-      shownMenuOnce.add(chatId);
-      return;
-    }
-
-    if (text === '🔙 Назад до користувацького меню') {
-      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-      return;
-    }
-
-    if (text === '📊 Статистика') {
-      await bot.sendMessage(chatId, `📊 Ось ваша статистика...`);
-      return;
-    }
-
-    if (text === '/start') {
-      if (isUserVerified) {
-        bot.sendMessage(chatId, `👋 Ви вже верифіковані.`, getMainKeyboard(chatId));
-      } else {
-        verificationRequests[chatId] = {
-          step: 1,
-          createdAt: Date.now(),
-          username: username || 'невідомо',
-          name: first_name || 'Невідомо'
-        };
-        bot.sendMessage(chatId, `🔐 Для доступу до бота, будь ласка, введіть Ваше ПІБ:`);
-      }
-      return;
-    }
-  } else {
-    // 🔹 Якщо повідомлення не текстове — просто логуємо
-    console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
-  
-  }
 
   // Якщо це не команда (типу /start) і користувач верифікований
 if (!msg.text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
@@ -1003,32 +949,104 @@ if (userIsAdmin && pendingMessage[chatId]) {
 
   // 📢 Режим розсилки
 
-    if (userIsAdmin && broadcastMode) {
-  // 🔹 Якщо прийшло фото
-  if (msg.photo) {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-    broadcastPayload.photoPath = fileUrl;
-
-    // Якщо є підпис до фото — збережемо його як текст
-    if (msg.caption && !broadcastPayload.text) {
-      broadcastPayload.text = msg.caption;
+  // Логування для діагностики
+  console.log('📥 Отримано повідомлення:', {
+    chatId,
+    text,
+    hasPhoto: !!msg.photo,
+    hasDocument: !!msg.document,
+    hasSticker: !!msg.sticker,
+    hasContact: !!msg.contact
+  });
+  // Захист від undefined
+  if (typeof text === 'string') {
+    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
+      shownMenuOnce.add(chatId);
+      return;
     }
 
-    bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
+    if (text === '🔙 Назад до користувацького меню') {
+      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+      return;
+    }
+
+    // інші обробки текстових повідомлень...
+  } else {
+    // Якщо повідомлення не текстове
+    console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
+  }
+
+  // 🔹 Якщо є текст
+  if (typeof text === 'string') {
+    // Приклад: кнопка "Назад"
+    if (text === '🔙 Назад до користувацького меню') {
+      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
+      return;
+    }
+
+    // Приклад: команди
+    if (text.startsWith('/')) {
+      // тут обробка команд
+      return;
+    }
+
+    // Приклад: звичайний текст користувача
+    if (isVerified(chatId) && !shownMenuOnce.has(chatId)) {
+      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
+      shownMenuOnce.add(chatId);
+      return;
+    }
+  }
+
+  // 🔹 Якщо прийшло фото
+  if (msg.photo) {
+    await bot.sendMessage(chatId, '🖼 Ви надіслали фото. Дякуємо!');
     return;
   }
 
-  // 🔹 Якщо прийшов текст (і він не команда)
-  if (!broadcastPayload.text && typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
-    broadcastPayload.text = text;
-    bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+  // 🔹 Якщо прийшов документ
+  if (msg.document) {
+    await bot.sendMessage(chatId, '📄 Ви надіслали документ. Дякуємо!');
     return;
   }
 
-  return;
-}
+  // 🔹 Якщо прийшов стікер
+  if (msg.sticker) {
+    await bot.sendMessage(chatId, '😄 Гарний стікер!');
+    return;
+  }
+
+  // 🔹 Якщо прийшов контакт
+  if (msg.contact) {
+    await bot.sendMessage(chatId, `📞 Контакт отримано: ${msg.contact.phone_number}`);
+    return;
+  }
+
+  // 🔹 Якщо нічого з вище
+  await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
+
+
+
+
+  if (userIsAdmin && broadcastMode) {
+    if (msg.photo) {
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      const file = await bot.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+      broadcastPayload.photoPath = fileUrl;
+      bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
+      return;
+    }
+
+    if (!broadcastPayload.text && text && !text.startsWith('/')) {
+      broadcastPayload.text = text;
+      bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+      return;
+    }
+
+    return;
+  }
 
   // ❓ Задати запитання
   if (text === '❓ Задати запитання') {
