@@ -275,9 +275,7 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
     return;
   }
 
-  let success = 0;
-  let failed = 0;
-
+  let success = 0, failed = 0;
   console.log('🚀 Запуск розсилки:', broadcastPayload, 'користувачів:', cachedUsers.length);
 
   for (const user of cachedUsers) {
@@ -297,13 +295,14 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
       failed++;
     }
 
-    await new Promise(res => setTimeout(res, 1000)); // throttle 1 сек
+    await new Promise(res => setTimeout(res, 1000)); // throttle
   }
 
   await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photoPath: null };
   broadcastMode = false;
 });
+
 // 🧭 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
   const chatId = msg.chat.id;
@@ -1020,26 +1019,28 @@ if (text.trim() !== '') {
   }
 // 📢 Режим розсилки
   if (userIsAdmin && broadcastMode) {
-    if (msg.photo) {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.photoPath = fileUrl;
+  if (msg.photo) {
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.photoPath = fileUrl;
 
-      if (caption && caption.trim() !== '') {
-        broadcastPayload.text = caption;
-      }
-
-      await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-      return;
+    // ✅ беремо caption як текст
+    if (caption && caption.trim() !== '') {
+      broadcastPayload.text = caption;
     }
 
-    if (!broadcastPayload.text && text.trim() !== '' && !text.startsWith('/')) {
-      broadcastPayload.text = text;
-      await bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
-      return;
-    }
+    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+    return;
   }
+
+  if (!broadcastPayload.text && text.trim() !== '' && !text.startsWith('/')) {
+    broadcastPayload.text = text;
+    await bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+}
+
 
   // 🔹 Якщо нічого з вище
   //ait bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
