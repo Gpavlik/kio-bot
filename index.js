@@ -949,104 +949,32 @@ if (userIsAdmin && pendingMessage[chatId]) {
 
   // 📢 Режим розсилки
 
-  // Логування для діагностики
-  console.log('📥 Отримано повідомлення:', {
-    chatId,
-    text,
-    hasPhoto: !!msg.photo,
-    hasDocument: !!msg.document,
-    hasSticker: !!msg.sticker,
-    hasContact: !!msg.contact
-  });
-  // Захист від undefined
-  if (typeof text === 'string') {
-    if (!text.startsWith('/') && isVerified(chatId) && !shownMenuOnce.has(chatId)) {
-      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
-      shownMenuOnce.add(chatId);
-      return;
-    }
-
-    if (text === '🔙 Назад до користувацького меню') {
-      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-      return;
-    }
-
-    // інші обробки текстових повідомлень...
-  } else {
-    // Якщо повідомлення не текстове
-    console.log('⚠️ msg.text відсутній, тип повідомлення:', Object.keys(msg));
-  }
-
-  // 🔹 Якщо є текст
-  if (typeof text === 'string') {
-    // Приклад: кнопка "Назад"
-    if (text === '🔙 Назад до користувацького меню') {
-      await bot.sendMessage(chatId, `🔄 Повертаємось до головного меню.`, getMainKeyboard(chatId));
-      return;
-    }
-
-    // Приклад: команди
-    if (text.startsWith('/')) {
-      // тут обробка команд
-      return;
-    }
-
-    // Приклад: звичайний текст користувача
-    if (isVerified(chatId) && !shownMenuOnce.has(chatId)) {
-      await bot.sendMessage(chatId, `📲 Головне меню`, getMainKeyboard(chatId));
-      shownMenuOnce.add(chatId);
-      return;
-    }
-  }
-
+    if (userIsAdmin && broadcastMode) {
   // 🔹 Якщо прийшло фото
   if (msg.photo) {
-    await bot.sendMessage(chatId, '🖼 Ви надіслали фото. Дякуємо!');
-    return;
-  }
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.photoPath = fileUrl;
 
-  // 🔹 Якщо прийшов документ
-  if (msg.document) {
-    await bot.sendMessage(chatId, '📄 Ви надіслали документ. Дякуємо!');
-    return;
-  }
-
-  // 🔹 Якщо прийшов стікер
-  if (msg.sticker) {
-    await bot.sendMessage(chatId, '😄 Гарний стікер!');
-    return;
-  }
-
-  // 🔹 Якщо прийшов контакт
-  if (msg.contact) {
-    await bot.sendMessage(chatId, `📞 Контакт отримано: ${msg.contact.phone_number}`);
-    return;
-  }
-
-  // 🔹 Якщо нічого з вище
-  await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
-
-
-
-
-  if (userIsAdmin && broadcastMode) {
-    if (msg.photo) {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.photoPath = fileUrl;
-      bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
-      return;
+    // Якщо є підпис до фото — збережемо його як текст
+    if (msg.caption && !broadcastPayload.text) {
+      broadcastPayload.text = msg.caption;
     }
 
-    if (!broadcastPayload.text && text && !text.startsWith('/')) {
-      broadcastPayload.text = text;
-      bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
-      return;
-    }
-
+    bot.sendMessage(chatId, `🖼 Фото додано. Тепер надішліть текст або /sendbroadcast для запуску.`);
     return;
   }
+
+  // 🔹 Якщо прийшов текст (і він не команда)
+  if (!broadcastPayload.text && typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
+    broadcastPayload.text = text;
+    bot.sendMessage(chatId, `✉️ Текст збережено. Якщо хочете — додайте фото або напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+
+  return;
+}
 
   // ❓ Задати запитання
   if (text === '❓ Задати запитання') {
