@@ -257,13 +257,13 @@ let broadcastPayload = { text: null, photoPath: null };
 let broadcastMode = false;
 
 // 🔘 Запуск режиму розсилки
-bot.onText(/\/broadcast/, (msg) => {
+bot.onText(/\/broadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
   broadcastMode = true;
   broadcastPayload = { text: null, photoPath: null };
 
-  bot.sendMessage(msg.chat.id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
+  await bot.sendMessage(msg.chat.id, `📢 Надішліть текст повідомлення для розсилки. Якщо хочете додати фото — надішліть його окремо після тексту.`);
 });
 // 🚀 Відправка розсилки
 bot.onText(/\/sendbroadcast/, async (msg) => {
@@ -271,7 +271,7 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   const { text: broadcastText, photoPath } = broadcastPayload; // ✅ уникаємо конфлікту
   if (!broadcastText) {
-    await bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення.`);
+    await bot.sendMessage(msg.chat.id, `⚠️ Спочатку надішліть текст повідомлення або фото з підписом.`);
     return;
   }
 
@@ -1006,7 +1006,17 @@ if (msg.contact) {
 // 🔹 Якщо нічого з вище
 await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
 
- if (isAdmin(chatId) && broadcastMode) {
+ console.log('📥 Отримано повідомлення:', {
+    chatId,
+    text,
+    caption,
+    hasPhoto: !!msg.photo,
+    hasDocument: !!msg.document,
+    hasSticker: !!msg.sticker,
+    hasContact: !!msg.contact
+  });
+
+  if (isAdmin(chatId) && broadcastMode) {
     // Фото
     if (msg.photo) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
@@ -1015,8 +1025,8 @@ await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано,
       broadcastPayload.photoPath = fileUrl;
 
       // ✅ якщо є caption — зберігаємо як текст
-      if (msg.caption && msg.caption.trim() !== '') {
-        broadcastPayload.text = msg.caption;
+      if (caption && caption.trim() !== '') {
+        broadcastPayload.text = caption;
       }
 
       await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
@@ -1030,7 +1040,6 @@ await bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано,
       return;
     }
   }
-
 
 
 // ❓ Задати запитання
