@@ -1026,8 +1026,8 @@ if (text.trim() !== '') {
     broadcastPayload.photoPath = fileUrl;
 
     // ✅ беремо caption як текст
-    if (caption && caption.trim() !== '') {
-      broadcastPayload.text = caption;
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.text = msg.caption;
     }
 
     await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.text ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
@@ -1040,7 +1040,6 @@ if (text.trim() !== '') {
     return;
   }
 }
-
 
   // 🔹 Якщо нічого з вище
   //ait bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
