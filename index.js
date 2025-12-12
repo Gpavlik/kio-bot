@@ -1027,8 +1027,34 @@ if (text.trim() !== '') {
     return;
   }
 // 📢 Режим розсилки
+let mediaGroups = {};
+
   if (isAdmin(chatId) && broadcastMode) {
     // Фото
+    if (msg.media_group_id) {
+      if (!mediaGroups[msg.media_group_id]) {
+        mediaGroups[msg.media_group_id] = [];
+      }
+
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      const file = await bot.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+
+      mediaGroups[msg.media_group_id].push({
+        url: fileUrl,
+        caption: caption
+      });
+ // невелика затримка щоб дочекатись усіх фото альбому
+      setTimeout(() => {
+        if (mediaGroups[msg.media_group_id]) {
+          broadcastPayload.photos = mediaGroups[msg.media_group_id].map(p => p.url);
+          broadcastPayload.caption = mediaGroups[msg.media_group_id][0].caption || '';
+          delete mediaGroups[msg.media_group_id];
+          bot.sendMessage(chatId, `🖼 Альбом з ${broadcastPayload.photos.length} фото додано. Напишіть /sendbroadcast для запуску.`);
+        }
+      }, 1000);
+      return;
+    }
     if (msg.photo) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
       const file = await bot.getFile(fileId);
