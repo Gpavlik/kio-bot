@@ -274,26 +274,25 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   let success = 0, failed = 0;
   const { text: broadcastText, photos, document, caption } = broadcastPayload;
-
   for (const user of cachedUsers) {
     const id = Number(user.chatId);
     if (!id || isNaN(id)) continue;
 
     try {
       if (photos.length > 1) {
-        const mediaGroup = photos.map((url, i) => ({
-          type: 'photo',
-          media: url,
-          caption: i === 0 ? (caption || broadcastText || '') : undefined
-        }));
-        await bot.sendMediaGroup(id, mediaGroup);
-      } else if (photos.length === 1) {
-        await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
-      } else if (document) {
-        await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
-      } else if (broadcastText) {
-        await bot.sendMessage(id, `📢 ${broadcastText}`);
-      }
+  const mediaGroup = photos.map((url, i) => ({
+    type: 'photo',
+    media: url,
+    caption: i === 0 ? (caption || broadcastText || '') : undefined
+  }));
+  await bot.sendMediaGroup(id, mediaGroup);
+} else if (photos.length === 1) {
+  await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
+} else if (document) {
+  await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
+} else if (broadcastText) {
+  await bot.sendMessage(id, `📢 ${broadcastText}`);
+}
 
       console.log(`➡️ Надіслано користувачу ${id}`);
       success++;
@@ -1056,41 +1055,42 @@ let mediaGroups = {};
       return;
     }
     if (msg.photo) {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.photos.push(fileUrl);
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
 
-      if (caption && caption.trim() !== '') {
-        broadcastPayload.caption = caption;
-      }
+    // ✅ додаємо фото у payload
+    broadcastPayload.photos.push(fileUrl);
 
-      await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-      return;
+    // ✅ якщо є caption — зберігаємо
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.caption = msg.caption;
     }
 
-    // Документ
-    if (msg.document) {
-      const fileId = msg.document.file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.document = fileUrl;
-
-      if (caption && caption.trim() !== '') {
-        broadcastPayload.caption = caption;
-      }
-
-      await bot.sendMessage(chatId, `📄 Документ додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-      return;
-    }
-
-    // Текст
-    if (text.trim() !== '' && !text.startsWith('/')) {
-      broadcastPayload.text = text;
-      await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
-      return;
-    }
+    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+    return;
   }
+
+  if (msg.document) {
+    const fileId = msg.document.file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.document = fileUrl;
+
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.caption = msg.caption;
+    }
+
+    await bot.sendMessage(chatId, `📄 Документ додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+
+  if (text.trim() !== '' && !text.startsWith('/')) {
+    broadcastPayload.text = text;
+    await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+}
 
 
   // 🔹 Якщо нічого з вище
