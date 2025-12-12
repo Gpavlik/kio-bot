@@ -277,12 +277,11 @@ const { text: broadcastText, photos, document, caption } = broadcastPayload;
 let success = 0, failed = 0;
 
   for (const user of cachedUsers) {
-    const id = Number(user.chatId);
-    if (!id || isNaN(id)) continue;
+  const id = Number(user.chatId);
+  if (!id || isNaN(id)) continue;
 
-    try {
-      // 📢 Тільки текст
-      if (photos.length > 1) {
+  try {
+    if (photos.length > 1) {
       const mediaGroup = photos.map((url, i) => ({
         type: 'photo',
         media: url,
@@ -300,9 +299,7 @@ let success = 0, failed = 0;
   } catch (err) {
     console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
   }
-
-    await new Promise(res => setTimeout(res, 1000)); // throttle
-  }
+}
 
   await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photos: [], document: null, caption: null };
@@ -1025,13 +1022,16 @@ if (text.trim() !== '') {
   }
 // 📢 Режим розсилки
   if (userIsAdmin && broadcastMode) {
-  // Фото
-    if (msg.photo) {
+  if (msg.photo) {
     const fileId = msg.photo[msg.photo.length - 1].file_id;
     const file = await bot.getFile(fileId);
     const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+
+    // ✅ зберігаємо фото
+    broadcastPayload.photos = broadcastPayload.photos || [];
     broadcastPayload.photos.push(fileUrl);
 
+    // ✅ зберігаємо caption
     if (msg.caption && msg.caption.trim() !== '') {
       broadcastPayload.caption = msg.caption;
     }
@@ -1059,8 +1059,7 @@ if (text.trim() !== '') {
     await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
     return;
   }
-  }
-
+}
   // 🔹 Якщо нічого з вище
   //ait bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
 
