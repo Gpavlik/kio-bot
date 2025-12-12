@@ -272,38 +272,46 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   console.log('🚀 broadcastPayload перед розсилкою:', broadcastPayload);
   console.log('👥 Кількість користувачів:', cachedUsers.length);
 
-  let success = 0;   // ✅ оголошуємо
-  let failed = 0;    // ✅ оголошуємо
+  let success = 0, failed = 0;
+
+  // ✅ беремо photos з broadcastPayload
+  const { text: broadcastText, photos, document, caption } = broadcastPayload;
 
   for (const user of cachedUsers) {
     const id = Number(user.chatId);
     if (!id || isNaN(id)) continue;
 
-  try {
-    if (photos.length > 1) {
-      const mediaGroup = photos.map((url, i) => ({
-        type: 'photo',
-        media: url,
-        caption: i === 0 ? (caption || broadcastText || '') : undefined
-      }));
-      await bot.sendMediaGroup(id, mediaGroup);
-    } else if (photos.length === 1) {
-      await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
-    } else if (document) {
-      await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
-    } else if (broadcastText) {
-      await bot.sendMessage(id, `📢 ${broadcastText}`);
+    try {
+      if (photos && photos.length > 1) {
+        const mediaGroup = photos.map((url, i) => ({
+          type: 'photo',
+          media: url,
+          caption: i === 0 ? (caption || broadcastText || '') : undefined
+        }));
+        await bot.sendMediaGroup(id, mediaGroup);
+      } else if (photos && photos.length === 1) {
+        await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
+      } else if (document) {
+        await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
+      } else if (broadcastText) {
+        await bot.sendMessage(id, `📢 ${broadcastText}`);
+      }
+      console.log(`➡️ Надіслано користувачу ${id}`);
+      success++;
+    } catch (err) {
+      console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
+      failed++;
     }
-    console.log(`➡️ Надіслано користувачу ${id}`);
-  } catch (err) {
-    console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
-  }
+
     await new Promise(res => setTimeout(res, 1000)); // throttle
   }
+
   await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
+
   broadcastPayload = { text: null, photos: [], document: null, caption: null };
   broadcastMode = false;
 });
+
 
 // 🧭 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
