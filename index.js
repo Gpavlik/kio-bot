@@ -271,8 +271,10 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   console.log('🚀 broadcastPayload перед розсилкою:', broadcastPayload);
   console.log('👥 Кількість користувачів:', cachedUsers.length);
+const { text: broadcastText, photos, document, caption } = broadcastPayload;
+  
 
-  let success = 0, failed = 0;
+let success = 0, failed = 0;
 
   for (const user of cachedUsers) {
     const id = Number(user.chatId);
@@ -280,36 +282,24 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
     try {
       // 📢 Тільки текст
-      if (broadcastPayload.text && !broadcastPayload.photos.length && !broadcastPayload.document) {
-        await bot.sendMessage(id, `📢 ${broadcastPayload.text}`);
-      }
-
-      // 🖼 Одне фото
-      if (broadcastPayload.photos.length === 1) {
-        await bot.sendPhoto(id, broadcastPayload.photos[0], { caption: broadcastPayload.caption || broadcastPayload.text || '' });
-      }
-
-      // 🖼 Група фото
-      if (broadcastPayload.photos.length > 1) {
-        const mediaGroup = broadcastPayload.photos.map((url, i) => ({
-          type: 'photo',
-          media: url,
-          caption: i === 0 ? (broadcastPayload.caption || broadcastPayload.text || '') : undefined
-        }));
-        await bot.sendMediaGroup(id, mediaGroup);
-      }
-
-      // 📄 Документ
-      if (broadcastPayload.document) {
-        await bot.sendDocument(id, broadcastPayload.document, { caption: broadcastPayload.caption || broadcastPayload.text || '' });
-      }
-
-      console.log(`➡️ Надіслано користувачу ${id}`);
-      success++;
-    } catch (err) {
-      console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
-      failed++;
+      if (photos.length > 1) {
+      const mediaGroup = photos.map((url, i) => ({
+        type: 'photo',
+        media: url,
+        caption: i === 0 ? (caption || broadcastText || '') : undefined
+      }));
+      await bot.sendMediaGroup(id, mediaGroup);
+    } else if (photos.length === 1) {
+      await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
+    } else if (document) {
+      await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
+    } else if (broadcastText) {
+      await bot.sendMessage(id, `📢 ${broadcastText}`);
     }
+    console.log(`➡️ Надіслано користувачу ${id}`);
+  } catch (err) {
+    console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
+  }
 
     await new Promise(res => setTimeout(res, 1000)); // throttle
   }
@@ -1037,40 +1027,38 @@ if (text.trim() !== '') {
   if (userIsAdmin && broadcastMode) {
   // Фото
     if (msg.photo) {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.photos.push(fileUrl);
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.photos.push(fileUrl);
 
-      if (caption && caption.trim() !== '') {
-        broadcastPayload.caption = caption;
-      }
-
-      await bot.sendMessage(chatId, `🖼 Фото додано. Напишіть /sendbroadcast для запуску.`);
-      return;
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.caption = msg.caption;
     }
 
-    // Документ
-    if (msg.document) {
-      const fileId = msg.document.file_id;
-      const file = await bot.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-      broadcastPayload.document = fileUrl;
+    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+    return;
+  }
 
-      if (caption && caption.trim() !== '') {
-        broadcastPayload.caption = caption;
-      }
+  if (msg.document) {
+    const fileId = msg.document.file_id;
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    broadcastPayload.document = fileUrl;
 
-      await bot.sendMessage(chatId, `📄 Документ додано. Напишіть /sendbroadcast для запуску.`);
-      return;
+    if (msg.caption && msg.caption.trim() !== '') {
+      broadcastPayload.caption = msg.caption;
     }
 
-    // Текст
-    if (text.trim() !== '' && !text.startsWith('/')) {
-      broadcastPayload.text = text;
-      await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
-      return;
-    }
+    await bot.sendMessage(chatId, `📄 Документ додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+    return;
+  }
+
+  if (text.trim() !== '' && !text.startsWith('/')) {
+    broadcastPayload.text = text;
+    await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
+    return;
+  }
   }
 
   // 🔹 Якщо нічого з вище
