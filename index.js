@@ -268,6 +268,8 @@ bot.onText(/\/broadcast/, async (msg) => {
 // 🚀 Відправка розсилки
 bot.onText(/\/sendbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
+console.log('🚀 broadcastPayload перед розсилкою:', broadcastPayload);
+console.log('👥 Кількість користувачів:', cachedUsers.length);
 
   const { text: broadcastText, photoPath } = broadcastPayload; // ✅ уникаємо конфлікту
   if (!broadcastText) {
