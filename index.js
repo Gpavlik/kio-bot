@@ -273,8 +273,6 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   console.log('👥 Кількість користувачів:', cachedUsers.length);
 
   let success = 0, failed = 0;
-
-  // ✅ беремо photos з broadcastPayload
   const { text: broadcastText, photos, document, caption } = broadcastPayload;
 
   for (const user of cachedUsers) {
@@ -282,20 +280,21 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
     if (!id || isNaN(id)) continue;
 
     try {
-      if (photos && photos.length > 1) {
+      if (photos.length > 1) {
         const mediaGroup = photos.map((url, i) => ({
           type: 'photo',
           media: url,
           caption: i === 0 ? (caption || broadcastText || '') : undefined
         }));
         await bot.sendMediaGroup(id, mediaGroup);
-      } else if (photos && photos.length === 1) {
+      } else if (photos.length === 1) {
         await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
       } else if (document) {
         await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
       } else if (broadcastText) {
         await bot.sendMessage(id, `📢 ${broadcastText}`);
       }
+
       console.log(`➡️ Надіслано користувачу ${id}`);
       success++;
     } catch (err) {
@@ -1028,45 +1027,45 @@ if (text.trim() !== '') {
     return;
   }
 // 📢 Режим розсилки
-  if (userIsAdmin && broadcastMode) {
-  if (msg.photo) {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+  if (isAdmin(chatId) && broadcastMode) {
+    // Фото
+    if (msg.photo) {
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      const file = await bot.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+      broadcastPayload.photos.push(fileUrl);
 
-    // ✅ зберігаємо фото
-    broadcastPayload.photos = broadcastPayload.photos || [];
-    broadcastPayload.photos.push(fileUrl);
+      if (caption && caption.trim() !== '') {
+        broadcastPayload.caption = caption;
+      }
 
-    // ✅ зберігаємо caption
-    if (msg.caption && msg.caption.trim() !== '') {
-      broadcastPayload.caption = msg.caption;
+      await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+      return;
     }
 
-    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-    return;
-  }
+    // Документ
+    if (msg.document) {
+      const fileId = msg.document.file_id;
+      const file = await bot.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+      broadcastPayload.document = fileUrl;
 
-  if (msg.document) {
-    const fileId = msg.document.file_id;
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-    broadcastPayload.document = fileUrl;
+      if (caption && caption.trim() !== '') {
+        broadcastPayload.caption = caption;
+      }
 
-    if (msg.caption && msg.caption.trim() !== '') {
-      broadcastPayload.caption = msg.caption;
+      await bot.sendMessage(chatId, `📄 Документ додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+      return;
     }
 
-    await bot.sendMessage(chatId, `📄 Документ додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-    return;
+    // Текст
+    if (text.trim() !== '' && !text.startsWith('/')) {
+      broadcastPayload.text = text;
+      await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
+      return;
+    }
   }
 
-  if (text.trim() !== '' && !text.startsWith('/')) {
-    broadcastPayload.text = text;
-    await bot.sendMessage(chatId, `✉️ Текст збережено. Напишіть /sendbroadcast для запуску.`);
-    return;
-  }
-}
 
   // 🔹 Якщо нічого з вище
   //ait bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
