@@ -260,6 +260,14 @@ let mediaGroups = {};
 // Запуск режиму розсилки
 bot.onText(/\/broadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
+await bot.sendMessage(msg.chat.id, `📢 Ви дійсно хочете створити нову розсилку?`, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '✅ Так', callback_data: 'confirm_broadcast' }],
+        [{ text: '❌ Ні', callback_data: 'cancel_broadcast' }]
+      ]
+    }
+  });
 
   broadcastMode = true;
   broadcastPayload = { text: null, photos: [], document: null, caption: null };
@@ -311,6 +319,14 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   broadcastMode = false;
 });
 
+bot.onText(/\/cancelbroadcast/, async (msg) => {
+  if (!isAdmin(msg.chat.id)) return;
+
+  broadcastMode = false;
+  broadcastPayload = { text: null, photos: [], document: null, caption: null };
+
+  await bot.sendMessage(msg.chat.id, `❌ Режим розсилки вимкнено. Ви можете почати нову розсилку командою /broadcast`);
+});
 
 // 🧭 Панель оператора
 bot.onText(/\/adminpanel/, (msg) => {
@@ -450,6 +466,21 @@ bot.on('callback_query', async (query) => {
     console.log('📥 Отримано callback_query:', { chatId, data });
 
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx9VpoHx_suctQ-8yKVHvRBuSWvjvGEzQ9SXDZK7yJP1RBS2KOp3m8xXxIEttTKetTr/exec';
+
+
+ if (query.data === 'confirm_broadcast') {
+    broadcastMode = true;
+    broadcastPayload = { text: null, photos: [], document: null, caption: null };
+    await bot.sendMessage(chatId, `📢 Режим розсилки активовано. Надішліть контент і завершіть командою /sendbroadcast`);
+  }
+
+  if (query.data === 'cancel_broadcast') {
+    broadcastMode = false;
+    broadcastPayload = { text: null, photos: [], document: null, caption: null };
+    await bot.sendMessage(chatId, `❌ Розсилка скасована.`);
+  }
+
+
 
   // 💰 Оплата
   if (data === 'payment_cod' || data === 'payment_prepaid') {
@@ -1029,6 +1060,11 @@ if (text.trim() !== '') {
 // 📢 Режим розсилки
 
   if (isAdmin(chatId) && broadcastMode) {
+
+       if (text.startsWith('/')) {
+        // якщо це команда, не додаємо у payload
+        return;
+    }
     // 📸 Альбом (media_group_id)
     if (msg.media_group_id) {
       if (!mediaGroups[msg.media_group_id]) {
