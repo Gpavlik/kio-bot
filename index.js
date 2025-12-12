@@ -272,11 +272,8 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   console.log('🚀 broadcastPayload перед розсилкою:', broadcastPayload);
   console.log('👥 Кількість користувачів:', cachedUsers.length);
 const { text: broadcastText, photos, document, caption } = broadcastPayload;
-  
 
-let success = 0, failed = 0;
-
-  for (const user of cachedUsers) {
+for (const user of cachedUsers) {
   const id = Number(user.chatId);
   if (!id || isNaN(id)) continue;
 
@@ -300,6 +297,7 @@ let success = 0, failed = 0;
     console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
   }
 }
+
 
   await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photos: [], document: null, caption: null };
@@ -1060,6 +1058,7 @@ if (text.trim() !== '') {
     return;
   }
 }
+
   // 🔹 Якщо нічого з вище
   //ait bot.sendMessage(chatId, 'ℹ️ Повідомлення отримано, але я його не можу обробити.');
 
