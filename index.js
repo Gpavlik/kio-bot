@@ -1003,25 +1003,25 @@ if (text.trim() !== '') {
   }
 
   // 🔹 Якщо прийшло фото
-  if (msg.photo) {
+  if (msg.photo && !broadcastMode) {
     await bot.sendMessage(chatId, '🖼 Ви надіслали фото. Дякуємо!');
     return;
   }
 
   // 🔹 Якщо прийшов документ
-  if (msg.document) {
+  if (msg.document && !broadcastMode) {
     await bot.sendMessage(chatId, '📄 Ви надіслали документ. Дякуємо!');
     return;
   }
 
   // 🔹 Якщо прийшов стікер
-  if (msg.sticker) {
+  if (msg.sticker && !broadcastMode) {
     await bot.sendMessage(chatId, '😄 Гарний стікер!');
     return;
   }
 
   // 🔹 Якщо прийшов контакт
-  if (msg.contact) {
+  if (msg.contact && !broadcastMode) {
     await bot.sendMessage(chatId, `📞 Контакт отримано: ${msg.contact.phone_number}`);
     return;
   }
