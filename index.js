@@ -271,11 +271,13 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
   console.log('🚀 broadcastPayload перед розсилкою:', broadcastPayload);
   console.log('👥 Кількість користувачів:', cachedUsers.length);
-const { text: broadcastText, photos, document, caption } = broadcastPayload;
 
-for (const user of cachedUsers) {
-  const id = Number(user.chatId);
-  if (!id || isNaN(id)) continue;
+  let success = 0;   // ✅ оголошуємо
+  let failed = 0;    // ✅ оголошуємо
+
+  for (const user of cachedUsers) {
+    const id = Number(user.chatId);
+    if (!id || isNaN(id)) continue;
 
   try {
     if (photos.length > 1) {
@@ -296,9 +298,8 @@ for (const user of cachedUsers) {
   } catch (err) {
     console.error(`❌ Не вдалося надіслати ${id}:`, err.response?.body || err.message);
   }
-}
-
-
+    await new Promise(res => setTimeout(res, 1000)); // throttle
+  }
   await bot.sendMessage(msg.chat.id, `✅ Розсилка завершена.\n📬 Успішно: ${success}\n⚠️ Помилки: ${failed}`);
   broadcastPayload = { text: null, photos: [], document: null, caption: null };
   broadcastMode = false;
