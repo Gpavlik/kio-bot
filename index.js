@@ -280,9 +280,9 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
 
     try {
       if (photos.length > 1) {
-  const mediaGroup = photos.map((url, i) => ({
+  const mediaGroup = photos.map((fileId, i) => ({
     type: 'photo',
-    media: url,
+    media: fileId, // ✅ передаємо file_id
     caption: i === 0 ? (caption || broadcastText || '') : undefined
   }));
   await bot.sendMediaGroup(id, mediaGroup);
@@ -1055,21 +1055,17 @@ let mediaGroups = {};
       return;
     }
     if (msg.photo) {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    const file = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+  const fileId = msg.photo[msg.photo.length - 1].file_id;
+  broadcastPayload.photos.push(fileId); // ✅ зберігаємо file_id, а не URL
 
-    // ✅ додаємо фото у payload
-    broadcastPayload.photos.push(fileUrl);
-
-    // ✅ якщо є caption — зберігаємо
-    if (msg.caption && msg.caption.trim() !== '') {
-      broadcastPayload.caption = msg.caption;
-    }
-
-    await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
-    return;
+  if (msg.caption && msg.caption.trim() !== '') {
+    broadcastPayload.caption = msg.caption;
   }
+
+  await bot.sendMessage(chatId, `🖼 Фото додано${broadcastPayload.caption ? ' з текстом' : ''}. Напишіть /sendbroadcast для запуску.`);
+  return;
+}
+
 
   if (msg.document) {
     const fileId = msg.document.file_id;
