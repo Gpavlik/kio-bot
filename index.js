@@ -1562,7 +1562,7 @@ if (text === '🔙 Назад до користувацького меню') {
 }
 
 // 🧼 Catch-all: якщо нічого не спрацювало
-if (typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
-  await bot.sendMessage(chatId, `🤖 Не впізнаю команду. Оберіть опцію з меню нижче:`, getMainKeyboard(chatId));
-}
+//if (typeof text === 'string' && text.trim() !== '' && !text.startsWith('/')) {
+//  await bot.sendMessage(chatId, `🤖 Не впізнаю команду. Оберіть опцію з меню нижче:`, getMainKeyboard(chatId));
+
 });
