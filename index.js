@@ -258,9 +258,15 @@ let broadcastMode = false;
 let mediaGroups = {};
 
 // Запуск режиму розсилки
+// Глобальні змінні для розсилки
+let broadcastPayload = { text: null, photos: [], document: null, caption: null };
+let broadcastMode = false;
+
+// 📢 Запуск режиму розсилки з підтвердженням
 bot.onText(/\/broadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
-await bot.sendMessage(msg.chat.id, `📢 Ви дійсно хочете створити нову розсилку?`, {
+
+  await bot.sendMessage(msg.chat.id, `📢 Ви дійсно хочете створити нову розсилку?`, {
     reply_markup: {
       inline_keyboard: [
         [{ text: '✅ Так', callback_data: 'confirm_broadcast' }],
@@ -268,12 +274,26 @@ await bot.sendMessage(msg.chat.id, `📢 Ви дійсно хочете ство
       ]
     }
   });
-
-  broadcastMode = true;
-  broadcastPayload = { text: null, photos: [], document: null, caption: null };
-
-  await bot.sendMessage(msg.chat.id, `📢 Надішліть текст, фото, групу фото або документ. Коли будете готові — напишіть /sendbroadcast`);
 });
+
+// Обробка підтвердження/скасування
+bot.on('callback_query', async (query) => {
+  const chatId = query.message.chat.id;
+
+  if (query.data === 'confirm_broadcast') {
+    broadcastMode = true;
+    broadcastPayload = { text: null, photos: [], document: null, caption: null };
+    await bot.sendMessage(chatId, `📢 Режим розсилки активовано. Надішліть текст, фото, групу фото або документ. Коли будете готові — напишіть /sendbroadcast\n\n❌ Для виходу використайте /cancelbroadcast`);
+  }
+
+  if (query.data === 'cancel_broadcast') {
+    broadcastMode = false;
+    broadcastPayload = { text: null, photos: [], document: null, caption: null };
+    await bot.sendMessage(chatId, `❌ Розсилка скасована.`);
+  }
+});
+
+// 🚀 Відправка розсилки
 bot.onText(/\/sendbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
@@ -288,14 +308,14 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
     if (!id || isNaN(id)) continue;
 
     try {
-      if (photos.length > 1) {
+      if (Array.isArray(photos) && photos.length > 1) {
         const mediaGroup = photos.map((fileId, i) => ({
           type: 'photo',
           media: fileId,
           caption: i === 0 ? (caption || broadcastText || '') : undefined
         }));
         await bot.sendMediaGroup(id, mediaGroup);
-      } else if (photos.length === 1) {
+      } else if (Array.isArray(photos) && photos.length === 1) {
         await bot.sendPhoto(id, photos[0], { caption: caption || broadcastText || '' });
       } else if (document) {
         await bot.sendDocument(id, document, { caption: caption || broadcastText || '' });
@@ -319,6 +339,7 @@ bot.onText(/\/sendbroadcast/, async (msg) => {
   broadcastMode = false;
 });
 
+// ❌ Скасування розсилки вручну
 bot.onText(/\/cancelbroadcast/, async (msg) => {
   if (!isAdmin(msg.chat.id)) return;
 
