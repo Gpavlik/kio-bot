@@ -258,9 +258,6 @@ let broadcastMode = false;
 let mediaGroups = {};
 
 // Запуск режиму розсилки
-// Глобальні змінні для розсилки
-let broadcastPayload = { text: null, photos: [], document: null, caption: null };
-let broadcastMode = false;
 
 // 📢 Запуск режиму розсилки з підтвердженням
 bot.onText(/\/broadcast/, async (msg) => {
