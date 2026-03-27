@@ -444,13 +444,14 @@ bot.sendMessage(chatId, header);
 // ✅ Формуємо список користувачів як текст
 const userList = users.users.map(u =>
   `👤 ${u.name} (${u.town}) — останнє замовлення: ${u.lastOrderDate || 'ніколи'}, всього: ${u.totalOrders || 0} зам.`
-).join('\n');
+);
 
-// ✅ Відправляємо повідомлення
-bot.sendMessage(chatId, `${header}\n\n${userList}`);
-
-
-  } catch (err) { 
+// ✅ Розбиваємо на шматки по 20 рядків
+const chunkSize = 20;
+for (let i = 0; i < userList.length; i += chunkSize) {
+  const chunk = userList.slice(i, i + chunkSize).join('\n');
+  await bot.sendMessage(chatId, chunk);
+}} catch (err) { 
     console.error('❌ Помилка отримання статистики:', err.message);
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
   }
