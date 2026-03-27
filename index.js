@@ -393,6 +393,8 @@ bot.onText(/📜 Історія замовлень/, async (msg) => {
   }
 });
 
+
+
 bot.onText(/📊 Статистика/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAdmin(chatId)) return;
@@ -417,26 +419,26 @@ bot.onText(/📊 Статистика/, async (msg) => {
     }
 
     const header =
-      `📊 Статистика замовлень:\n` +
-      `🔢 Всього: ${orders.total} замовлень / ${orders.totalQuantity} уп.\n` +
-      `✅ Прийнято: ${orders.accepted} / ${orders.acceptedQuantity} уп.\n` +
-      `❌ Скасовано: ${orders.canceled}\n` +
-      `⏳ Очікує: ${orders.pending}\n` +
-      `📦 Відправлено: ${orders.sent} / ${orders.sentQuantity} уп.\n` +
-      `💳 Оплачено: ${orders.paid} / ${orders.paidQuantity} уп.\n` +
-      `💰 Заробіток: ${orders.profit.toLocaleString('uk-UA')} грн\n\n` +
-      `👥 Статистика користувачів:\n` +
-      `🔢 Всього: ${users.totalUsers}\n` +
-      `📦 З замовленнями: ${users.withOrders}\n` +
-      `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
-      `🧑‍💼 Статистика по операторах:\n` +
-      (Array.isArray(users.operators)
-        ? users.operators.map(op =>
-            `👤 ${op.name} — 👥 ${op.totalUsers} корист., 📦 ${op.totalOrders} зам., ` +
-            `${op.totalQuantity} уп., 💰 ${op.totalProfit.toLocaleString('uk-UA')} грн`
-          ).join('\n')
-        : '—') +
-      `\n\n📋 Користувачі:`;
+  `📊 Статистика замовлень:\n` +
+  `🔢 Всього: ${orders.total} замовлень / ${orders.totalQuantity} уп.\n` +
+  `✅ Прийнято: ${orders.accepted} / ${orders.acceptedQuantity} уп.\n` +
+  `❌ Скасовано: ${orders.canceled}\n` +
+  `⏳ Очікує: ${orders.pending}\n` +
+  `📦 Відправлено: ${orders.sent} / ${orders.sentQuantity} уп.\n` +
+  `💳 Оплачено: ${orders.paid} / ${orders.paidQuantity} уп.\n` +
+  `💰 Заробіток: ${orders.profit.toLocaleString('uk-UA')} грн\n\n` +
+  `👥 Статистика користувачів:\n` +
+  `🔢 Всього: ${users.totalUsers}\n` +
+  `📦 З замовленнями: ${users.withOrders}\n` +
+  `🚫 Без замовлень: ${users.withoutOrders}\n\n` +
+  `🧑‍💼 Статистика по операторах:\n` +
+  (Array.isArray(users.operators)
+    ? users.operators.map(op =>
+        `👤 ${op.name} — 👥 ${op.totalUsers} корист., 📦 ${op.totalOrders} зам., ` +
+        `${op.totalQuantity} уп., 💰 ${op.totalProfit.toLocaleString('uk-UA')} грн`
+      ).join('\n')
+    : '—');
+
 
     // ✅ Генерація кнопок
     const buttons = users.users.map(u => {
