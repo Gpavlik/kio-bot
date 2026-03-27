@@ -441,13 +441,15 @@ bot.onText(/📊 Статистика/, async (msg) => {
 
 bot.sendMessage(chatId, header);
 
-// ✅ Формуємо список користувачів текстом
+// ✅ Формуємо список користувачів як текст
 const userList = users.users.map(u =>
   `👤 ${u.name} (${u.town}) — останнє замовлення: ${u.lastOrderDate || 'ніколи'}, всього: ${u.totalOrders || 0} зам.`
 ).join('\n');
 
-// ✅ Відправляємо одним повідомленням
+// ✅ Відправляємо повідомлення
 bot.sendMessage(chatId, `${header}\n\n${userList}`);
+
+
   } catch (err) { 
     console.error('❌ Помилка отримання статистики:', err.message);
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
