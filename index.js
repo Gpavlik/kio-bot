@@ -418,7 +418,7 @@ bot.onText(/📊 Статистика/, async (msg) => {
       return bot.sendMessage(chatId, `⚠️ Дані користувачів не отримано або мають неправильний формат.`);
     }
 
-    const header =
+   const header =
   `📊 Статистика замовлень:\n` +
   `🔢 Всього: ${orders.total} замовлень / ${orders.totalQuantity} уп.\n` +
   `✅ Прийнято: ${orders.accepted} / ${orders.acceptedQuantity} уп.\n` +
@@ -439,25 +439,17 @@ bot.onText(/📊 Статистика/, async (msg) => {
       ).join('\n')
     : '—');
 
+bot.sendMessage(chatId, header);
 
-    // ✅ Генерація кнопок
-    const buttons = users.users.map(u => {
-      const label = `${u.name} (${u.town}) — ${u.lastOrderDate || 'ніколи'}, ${u.totalOrders || 0} зам.`;
-      return [{ text: label, callback_data: `msg_${u.chatId}` }];
-    });
+// ✅ Формуємо список користувачів текстом
+const userList = users.users.map(u =>
+  `👤 ${u.name} (${u.town}) — останнє замовлення: ${u.lastOrderDate || 'ніколи'}, всього: ${u.totalOrders || 0} зам.`
+).join('\n');
 
-    if (!Array.isArray(buttons) || !buttons.length) {
-      console.warn('⚠️ Кнопки не згенеровані:', buttons);
-      return bot.sendMessage(chatId, `⚠️ Немає користувачів для статистики.`);
-    }
-
-    bot.sendMessage(chatId, header, {
-      reply_markup: {
-        inline_keyboard: buttons
-      }
-    });
-  } catch (err) {
-    console.error('❌ Помилка статистики:', err.message);
+// ✅ Відправляємо одним повідомленням
+bot.sendMessage(chatId, `${header}\n\n${userList}`);
+  } catch (err) { 
+    console.error('❌ Помилка отримання статистики:', err.message);
     bot.sendMessage(chatId, `⚠️ Не вдалося отримати статистику: ${err.message}`);
   }
 });
